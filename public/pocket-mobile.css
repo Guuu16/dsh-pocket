@@ -1,0 +1,38 @@
+/* Mobile comfort layer for the injected dsh GUI.
+ *
+ * Deliberately minimal: the GUI already handles narrow viewports (its icon rail
+ * collapses the workspace sidebar behind a "打开侧边栏" toggle), and overriding
+ * that layout was measured to break the conversation pane's positioning.
+ * What the GUI genuinely lacks on a phone is safe-area awareness and
+ * finger-sized hit targets.
+ *
+ * Width-gated, so a desktop browser at the same gateway is untouched.
+ */
+
+@media (max-width: 860px) {
+  /* Keep the top rail and the composer clear of the notch and home indicator. */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* iOS zooms the whole page when a focused input is under 16px. */
+  textarea,
+  input[type="text"],
+  input[type="search"] {
+    font-size: 16px;
+  }
+}
+
+/* A 36px control is a miss on a phone; give the icon rail room without moving it. */
+button[aria-label] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  button[aria-label] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

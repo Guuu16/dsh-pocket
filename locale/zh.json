@@ -1,0 +1,6 @@
+{
+  "dsh-pocket": {
+    "title": "dsh pocket 远程访问",
+    "description": "从任何地方访问这台机器的 dsh：在这里配置一台中继服务器，用访问密钥把入口看住，并给现有 GUI 套一层手机外壳。"
+  }
+}

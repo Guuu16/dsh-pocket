@@ -1,0 +1,8 @@
+# dsh-pocket: the remote-access surface for this machine.
+#
+# One Host row. It opens a LAN/public listener that serves the same dsh GUI this
+# process already serves on loopback, mounts the mobile shell into that GUI, and
+# keeps an outbound tunnel to a relay the user configures from inside dsh.
+- insert:
+    - id: dsh-pocket
+      name: dsh-pocket

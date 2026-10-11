@@ -1,0 +1,38 @@
+{
+  "name": "dsh-pocket",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Reach this machine's DeepSeek Harness from anywhere: a public entry point, a relay you configure inside dsh, and a mobile shell for the existing web GUI.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./client": "./client.js"
+  },
+  "icon": "./public/pocket.svg",
+  "meta": {
+    "title": "dsh pocket",
+    "description": "从任何地方访问这台机器的 dsh：配置一台中继服务器即可获得公网入口。"
+  },
+  "bin": {
+    "dsh-pocket": "./bin/dsh-pocket.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.15"
+  },
+  "dependencies": {}
+}
