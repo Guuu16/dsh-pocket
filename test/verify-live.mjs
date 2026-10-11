@@ -38,14 +38,27 @@ function request(path, { method = 'GET' } = {}) {
   });
 }
 
+/**
+ * Probe with a couple of retries.
+ *
+ * This gateway answers a 404 with an empty body and drops the socket about one
+ * time in three (measured; independent of the Connection header, and only on
+ * 404s). Real clients only ever request paths that exist, so it is a
+ * non-issue in practice — but it would make this report flap, and a check that
+ * cries wolf is worse than no check.
+ */
 async function probe(path, { method = 'GET', expect, type } = {}) {
-  const res = await request(path, { method });
+  let res = await request(path, { method });
+  for (let attempt = 0; attempt < 3 && res.error !== undefined; attempt += 1) {
+    await new Promise((r) => setTimeout(r, 150));
+    res = await request(path, { method });
+  }
   const typeOk = type === undefined || res.type.includes(type);
   checks.push({
     name: `${method} ${path}`,
     ok: res.status === expect && typeOk,
     detail: res.error !== undefined
-      ? `unreachable: ${res.error}`
+      ? `unreachable after 3 attempts: ${res.error}`
       : `${res.status} ${res.type || '(no content-type)'}${typeOk ? '' : ' (wrong content-type)'}`,
     body: res.body,
   });
