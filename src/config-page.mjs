@@ -33,10 +33,18 @@ h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(-
 label { display:block; font-size:13px; color:var(--dim); margin:14px 0 5px; }
 input, select { width:100%; height:40px; padding:0 11px; border:1px solid var(--line); border-radius:9px;
   background:var(--bg); color:var(--fg); font:inherit; font-size:14px; }
-button { height:42px; padding:0 18px; border:1px solid transparent; border-radius:10px; background:var(--accent); color:#fff;
-  font:inherit; font-weight:600; cursor:pointer; }
-button.ghost { background:var(--panel); border-color:var(--line); color:var(--fg); font-weight:500; }
-button:hover { filter:brightness(1.08); }
+
+/* Colours here are hard-coded and marked important on purpose. This page is
+   also opened inside hosts that inject their own stylesheets, and a themed
+   variable that resolved to the wrong value there produced a white-on-white
+   button. A fixed blue on white text is legible in any theme and cannot be
+   overridden from the outside. */
+button { height:42px; padding:0 18px; border-radius:10px; cursor:pointer;
+  background:#3f63f5 !important; color:#ffffff !important; border:1px solid #3f63f5 !important;
+  font:inherit; font-weight:600; text-shadow:0 1px 1px rgba(0,0,0,.22); }
+button.ghost { background:#1c2333 !important; color:#e8ecf5 !important; border:1px solid #3a4455 !important;
+  font-weight:500; text-shadow:none; }
+button:hover { filter:brightness(1.1); }
 button:active { transform:translateY(1px); }
 button:disabled { opacity:.6; cursor:default; }
 form.inline { display:inline; }
