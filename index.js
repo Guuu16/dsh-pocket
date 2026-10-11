@@ -225,7 +225,18 @@ export function apply(ctx) {
         remotePort: form.get("remotePort"),
       });
     }
-    html(res, 200, renderConfigPage({ store: readStore(), status: { ...status, lanUrls: lanUrls() } }));
+    let projects;
+    try {
+      projects = await discoverProjects();
+    } catch {
+      // The page must still render if discovery is unavailable.
+      projects = undefined;
+    }
+    html(res, 200, renderConfigPage({
+      store: readStore(),
+      status: { ...status, lanUrls: lanUrls() },
+      projects,
+    }));
   }
 
   function lanUrls() {

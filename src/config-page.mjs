@@ -49,6 +49,13 @@ button:active { transform:translateY(1px); }
 button:disabled { opacity:.6; cursor:default; }
 form.inline { display:inline; }
 .qr { display:block; width:132px; height:132px; margin:10px 0 4px; border-radius:10px; background:#ffffff; padding:6px; }
+details { margin:0 0 14px; }
+summary { cursor:pointer; padding:11px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel);
+  font-size:13.5px; color:var(--dim); list-style:none; }
+summary::-webkit-details-marker { display:none; }
+summary::before { content:"▸ "; }
+details[open] summary::before { content:"▾ "; }
+details[open] summary { margin-bottom:12px; }
 .url { display:block; padding:10px 12px; border-radius:10px; background:var(--bg); border:1px solid var(--line);
   font-family:ui-monospace, Menlo, monospace; font-size:12.5px; margin:8px 0; word-break:break-all; }
 .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:var(--dim); }
@@ -76,6 +83,22 @@ export function renderConfigPage(input) {
 
   /** One QR image tag; the encoder lives on the host, not in this page. */
   const qr = (value) => `<img class="qr" src="/remote/api/qr?text=${encodeURIComponent(value)}" alt="扫码打开" loading="lazy">`;
+
+  /*
+   * The project list this page cannot fix by itself.
+   *
+   * The action lives in the dsh settings section, because registering a
+   * workspace writes the user's own durable state — that is not something a
+   * one-tap button on a public-facing page should reach for. This page tells
+   * the user what is missing and where to press.
+   */
+  const projects = input.projects ?? { total: 0, registered: [], missing: [] };
+  const missingProjects = projects.missing ?? [];
+  const projectsBlock = missingProjects.length > 0
+    ? `<div class="note">磁盘上有 ${projects.total} 个目录的历史记录，其中 ${missingProjects.length} 个没进 dsh 的工作区列表，打开侧边栏看不到它们：</div>` +
+      missingProjects.map((item) => `<span class="url">${esc(item.title)} — ${item.sessions} 个会话</span>`).join("") +
+      `<div class="note">在电脑上的 dsh 里打开 <b>设置 → 远程访问</b>，点「补齐」即可，那边的按钮会写进 dsh 自己的工作区列表。</div>`
+    : `<div class="note">磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。</div>`;
   const lanBlock = (status.lanUrls ?? []).length === 0
     ? '<div class="note">没有检测到局域网地址。</div>'
     : (status.lanUrls ?? []).map((url, index) => `<span class="url">${esc(url)}/?k=${esc(key)}</span>${index === 0 ? qr(`${url}/?k=${key}`) : ""}`).join("");
@@ -92,28 +115,28 @@ export function renderConfigPage(input) {
 <h1>dsh remote</h1>
 <div class="sub">从任何地方访问这台机器的 dsh。手机访问 dsh 本身的界面——同一份工作区、同一份聊天记录。</div>
 
+<h2>扫码打开</h2>
+<div class="card">${lanBlock}${publicBlock}
+  <div class="note">用手机相机扫。同一 WiFi 时用带 <code>192.168.</code> 的那条，最快；不在同一网络时用 <code>https://</code> 那条。第一次打开会把密钥换成 cookie，之后加进主屏就是一个全屏 app。</div>
+</div>
+
 <h2>当前状态</h2>
 <div class="card">
-  <div class="row"><span class="k">网关</span><span class="pill ${status.gateway === "listening" ? "on" : "off"}">${esc(status.gateway ?? "未启动")}</span></div>
-  <div class="row" style="margin-top:8px"><span class="k">中继隧道</span><span class="pill ${status.tunnel === "up" ? "on" : "off"}">${esc(status.tunnel ?? "未启动")}</span></div>
+  <div class="row"><span class="k">网关</span><span class="pill ${status.gateway === "listening" ? "on" : "off"}">${esc(status.gateway ?? "未启动")}</span><span class="k" style="margin-left:16px">隧道</span><span class="pill ${status.tunnel === "up" ? "on" : "off"}">${esc(status.tunnel ?? "未启动")}</span></div>
   ${status.error === undefined ? "" : `<div class="note" style="color:var(--warn)">${esc(status.error)}</div>`}
-  <div class="row" style="margin-top:10px"><span class="k">访问密钥</span><span class="v">${esc(key)}</span></div>
+  <div class="row" style="margin-top:8px"><span class="k">访问密钥</span><span class="v">${esc(key)}</span></div>
   <form class="inline" method="post" action="/remote/rotate" style="margin-top:10px">
     <button class="ghost" type="submit">换一把密钥（所有已配对设备失效）</button>
   </form>
 </div>
 
-<h2>局域网地址</h2>
-<div class="card">${lanBlock}
-  <div class="note">手机和这台机器在同一 WiFi 时，用这个地址直接打开。</div>
-</div>
-
-<h2>公网地址</h2>
-<div class="card">${publicBlock}
-  <div class="note">不在同一网络时用这个。必须带 <code>?k=</code>，第一次打开会换成 cookie。</div>
+<h2>项目</h2>
+<div class="card">${projectsBlock}
 </div>
 
 <h2>中继服务器</h2>
+<details${mode === "off" ? "" : " open"}>
+<summary>${mode === "off" ? "当前未启用（点开配置）" : mode === "ssh" ? "当前方式：SSH 反向隧道" : "当前方式：Cloudflare 隧道"}</summary>
 <form method="post" action="/remote/config">
 <div class="card">
   <label for="mode">方式</label>
@@ -142,16 +165,18 @@ export function renderConfigPage(input) {
   <div class="note">
     保存后立即生效。SSH 方式首次会用密码登录并把本机公钥装到服务器上，之后就不再需要密码；
     服务器需要 <code>GatewayPorts clientspecified</code> 并在云平台安全组放行该端口。
+    <br><br>在电脑上的 dsh 里改更方便：<b>设置 → 远程访问</b>。
   </div>
 </div>
 </form>
+</details>
 
 <h2>怎么用</h2>
 <div class="card">
 <ol>
-  <li>在上面选一种中继方式，填好服务器（Cloudflare 方式可以留空），保存。</li>
-  <li>回到「公网地址」，把那一整行（含 <code>?k=</code>）发到手机上打开。</li>
-  <li>加进主屏，之后就是一个全屏 app。</li>
+  <li>用手机相机扫上面第一个二维码，直接打开。</li>
+  <li>在浏览器里「添加到主屏幕」，之后就是一个全屏 app，不用再输地址。</li>
+  <li>要改中继或补项目，在电脑上的 dsh 里打开 <b>设置 → 远程访问</b>，或者用这一页。</li>
 </ol>
 <div class="note">访问密钥是唯一的门禁。不装这个插件、没有这把密钥，任何人都进不来。</div>
 </div>
