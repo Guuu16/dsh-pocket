@@ -20,7 +20,7 @@
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { basename, extname } from "node:path";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { createProxy } from "./src/proxy.mjs";
 import { injectMobileShell } from "./src/inject.mjs";
@@ -284,16 +284,25 @@ export function apply(ctx) {
     registered.sort((a, b) => b.sessions - a.sessions);
 
     const missing = [];
+    const vanished = [];
     for (const [cwd, sessions] of counts) {
       if (owned.has(cwd)) continue;
-      missing.push({ path: cwd, title: basename(cwd), sessions });
+      const entry = { path: cwd, title: basename(cwd), sessions };
+      // History outlives the directory. `workspaceRegistry.create` canonicalizes
+      // through realpath and rejects a path that is gone, so offering it as
+      // "register this" produces a button that can only fail. It is a different
+      // situation from an unregistered project and needs to read differently.
+      if (existsSync(cwd)) missing.push(entry);
+      else vanished.push(entry);
     }
     missing.sort((a, b) => b.sessions - a.sessions);
+    vanished.sort((a, b) => b.sessions - a.sessions);
 
     return {
       total: counts.size,
       registered,
       missing,
+      vanished,
       orphaned: registered.filter((item) => item.present === false).length,
     };
   }
@@ -311,6 +320,8 @@ export function apply(ctx) {
     const { missing } = await discoverProjects();
     const added = [];
     const failed = [];
+    // `missing` already excludes directories that no longer exist, so every
+    // entry here is one realpath will accept.
     for (const item of missing) {
       try {
         await ctx.workspaceRegistry.create(item.path, item.title);

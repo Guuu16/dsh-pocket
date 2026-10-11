@@ -71,10 +71,14 @@ function call(routes, path, { method = 'GET', body, query = '' } = {}) {
   });
 }
 
+// Discovery stats the filesystem now, so a "missing project" has to be a real
+// directory and a "vanished" one a path that does not exist.
+const REAL_DIR = new URL('.', import.meta.url).pathname.replace(/\/$/, '');
+const GONE_DIR = '/nonexistent/definitely-not-here';
 const SESSIONS = [
-  { header: { cwd: '/w/app' } }, { header: { cwd: '/w/app' } },
-  { header: { cwd: '/w/lost' } }, { header: { cwd: '/w/lost' } },
-  { header: { cwd: '/w/lost' } }, { header: { cwd: '/w/lost' } },
+  { header: { cwd: REAL_DIR } }, { header: { cwd: REAL_DIR } },
+  { header: { cwd: GONE_DIR } }, { header: { cwd: GONE_DIR } },
+  { header: { cwd: GONE_DIR } }, { header: { cwd: GONE_DIR } },
   { header: { cwd: '/w/known' } },
   { header: {} },                                  // no cwd must be skipped
 ];
@@ -152,10 +156,15 @@ section('project discovery');
   const p = body.projects;
   check('counts distinct cwds, skipping the empty one', p.total === 3, `total=${p.total}`);
   check('reports registered workspaces', p.registered.length === 3, `n=${p.registered.length}`);
-  check('names the missing projects', p.missing.map((m) => m.title).sort().join(',') === 'lost',
-    JSON.stringify(p.missing.map((m) => m.title)));
-  check('counts sessions per missing project', p.missing.every((m) => m.sessions === 4),
-    JSON.stringify(p.missing));
+  check('names the missing project', p.missing.length === 1 && p.missing[0].path === REAL_DIR,
+    JSON.stringify(p.missing.map((m) => m.path)));
+  check('a project whose directory is gone is reported separately',
+    p.vanished.length === 1 && p.vanished[0].path === GONE_DIR,
+    JSON.stringify(p.vanished.map((m) => m.path)));
+  check('and it is not offered as registerable',
+    !p.missing.some((m) => m.path === GONE_DIR));
+  check('counts sessions for the vanished project',
+    p.vanished.every((m) => m.sessions === 4), JSON.stringify(p.vanished));
   check('flags a workspace whose directory is gone', p.orphaned === 1, `orphaned=${p.orphaned}`);
   check('registered entries carry the session count from the registry',
     p.registered.find((r) => r.title === 'app')?.sessions === 2,
@@ -167,9 +176,10 @@ section('project discovery');
   section('project sync');
   const sync = await call(routes, '/remote/api/sync', { method: 'POST' });
   const synced = JSON.parse(sync.body);
-  check('registers only the missing directory', created.length === 1 && created[0].path === '/w/lost',
+  check('registers only the real directory', created.length === 1 && created[0].path === REAL_DIR,
     JSON.stringify(created));
-  check('reports what it added', synced.synced.added.join(',') === 'lost', JSON.stringify(synced.synced));
+  check('never tries to register a directory that is gone',
+    !created.some((c) => c.path === GONE_DIR), JSON.stringify(created));
   check('reports no failures', synced.synced.failed.length === 0);
   const get = await call(routes, '/remote/api/sync');
   check('405 for GET on sync', get.status === 405);
@@ -236,6 +246,7 @@ section('settings section component');
         { path: '/w/gone', title: 'gone', sessions: 0, present: false },
       ],
       missing: [{ path: '/w/lost', title: 'lost', sessions: 4 }],
+      vanished: [{ path: '/w/gone-dir', title: 'gone-dir', sessions: 2 }],
     },
   };
   React.seed([
@@ -252,6 +263,7 @@ section('settings section component');
   check('lists a healthy project with its count', /app/.test(text) && /2 个会话/.test(text));
   check('marks a missing project', /＋/.test(text) && /lost/.test(text) && /4 个会话/.test(text));
   check('marks an orphaned workspace', /✕/.test(text) && /gone/.test(text));
+  check('marks a deleted directory differently', /—/.test(text) && /gone-dir/.test(text) && /目录已删除/.test(text));
   check('warns when something is wrong', classes.includes('dshr-warn-card'));
   check('offers the补齐 action', /补齐这 1 个项目（4 个会话）/.test(text), text.match(/补齐[^ ]*/)?.[0]);
   check('offers the auto-sync toggle',
@@ -262,13 +274,13 @@ section('settings section component');
 
   // all-clear state
   React.seed([
-    { ...state, projects: { total: 2, registered: state.projects.registered.slice(0, 1), missing: [], orphaned: 0 } },
+    { ...state, projects: { total: 2, registered: state.projects.registered.slice(0, 1), missing: [], vanished: [], orphaned: 0 } },
     { mode: 'off', host: '', user: '', sshPort: 22, remotePort: 8787, password: '' },
     false, '', '', '', { current: undefined }, { current: undefined },
   ]);
   const clean = { text: textOf(expand(walk(Component({})), ['RemoteAccess'])), classes: classOf(expand(walk(Component({})), ['RemoteAccess'])) };
   React.seed([
-    { ...state, projects: { total: 2, registered: [state.projects.registered[0]], missing: [], orphaned: 0 } },
+    { ...state, projects: { total: 2, registered: [state.projects.registered[0]], missing: [], vanished: [], orphaned: 0 } },
     { mode: 'off', host: '', user: '', sshPort: 22, remotePort: 8787, password: '' },
     false, '', '', '', { current: undefined }, { current: undefined },
   ]);

@@ -299,35 +299,43 @@ window.__ModuleLoader__.load({
         h("p", null, "手机访问的就是 dsh 本身的界面——同一份工作区、同一份聊天记录。这里配置从外网进来的路径。"),
 
         (function projectsCard() {
-          const projects = state.projects ?? { total: 0, registered: [], missing: [] };
+          const projects = state.projects ?? { total: 0, registered: [], missing: [], vanished: [] };
           const registered = projects.registered ?? [];
           const missing = projects.missing ?? [];
+          const vanished = projects.vanished ?? [];
           const orphans = registered.filter((item) => item.present === false);
           const pending = missing.reduce((sum, item) => sum + item.sessions, 0);
-          const healthy = missing.length === 0 && orphans.length === 0;
+          const trouble = missing.length + vanished.length + orphans.length;
+          const healthy = trouble === 0;
 
-          const line = (item, mark, markClass) =>
+          const line = (item, mark, markClass, suffix) =>
             h("div", { className: "dshr-pline", key: item.path },
               h("span", { className: markClass }, mark),
               h("span", { className: "dshr-ptitle" }, item.title),
-              h("span", { className: "dshr-note" }, item.sessions === undefined ? "" : `${item.sessions} 个会话`)
+              h("span", { className: "dshr-note" },
+                (item.sessions === undefined ? "" : `${item.sessions} 个会话`) + (suffix ?? ""))
             );
 
           const rows = [];
           for (const item of registered) {
-            rows.push(line(item, item.present === false ? "✕" : "✓", item.present === false ? "dshr-bad" : "dshr-ok"));
+            rows.push(line(item, item.present === false ? "✕" : "✓",
+              item.present === false ? "dshr-bad" : "dshr-ok",
+              item.present === false ? "　目录不在了" : undefined));
           }
           for (const item of missing) rows.push(line(item, "＋", "dshr-wait"));
+          for (const item of vanished) rows.push(line(item, "—", "dshr-note", "　目录已删除，只剩历史"));
 
           return h("div", { className: "dshr-card" + (healthy ? " dshr-ok-card" : " dshr-warn-card") },
             h("h3", null, healthy
               ? `项目 · ${registered.length} 个，全部可用`
-              : `项目 · ${missing.length + orphans.length} 个有问题`),
+              : `项目 · ${trouble} 个要注意`),
             h("p", { className: "dshr-note" }, missing.length > 0
               ? `磁盘上有 ${projects.total} 个目录的历史记录，其中 ${missing.length} 个没进 dsh 的工作区列表，打开侧边栏看不到它们，${pending} 个会话也一起看不见：`
-              : orphans.length > 0
-                ? `磁盘上有历史记录的 ${projects.total} 个目录都已有对应的工作区，但下面 ${orphans.length} 个的目录已经不在了。`
-                : `磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。`),
+              : vanished.length > 0
+                ? `磁盘上有历史记录的 ${projects.total} 个目录，其中 ${vanished.length} 个的目录已经被删掉了——会话记录还在，但没有目录可以打开：`
+                : orphans.length > 0
+                  ? `磁盘上有历史记录的 ${projects.total} 个目录都已有对应的工作区，但下面 ${orphans.length} 个的目录已经不在了。`
+                  : `磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。`),
             orphans.length === 0 ? null : h("p", { className: "dshr-err" },
               `${orphans.length} 个工作区的目录已经不在了：${orphans.map((o) => o.title).join("、")}`),
             h("div", { className: "dshr-plist" }, rows),
