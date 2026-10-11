@@ -31,8 +31,17 @@ button[aria-label] {
 }
 
 @media (pointer: coarse) {
+  /*
+   * Height only. Forcing a 44px *width* was measured to overflow the GUI's own
+   * sidebar: the rows that host these buttons sit in a 35px lane
+   * (clientWidth 35, scrollWidth 44 on logoRow / panelList / sectionHeader),
+   * so a minimum width pushes their content past the container and the whole
+   * frame grows to 780px inside a 390px viewport.
+   *
+   * Height has no such constraint — the rail buttons are already full-width of
+   * their lane — so this keeps the finger-sized target where it matters.
+   */
   button[aria-label] {
-    min-width: 44px;
     min-height: 44px;
   }
 }
