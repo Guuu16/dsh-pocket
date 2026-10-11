@@ -30,6 +30,7 @@ import { authorize, mintRemoteCookie, remoteCookieAttributes } from "./src/confi
 import { readStore, rotateAccessKey, writeStore } from "./src/store.mjs";
 import { ensureKeyLogin } from "./src/ssh-setup.mjs";
 import { renderConfigPage } from "./src/config-page.mjs";
+import QRCode from "qrcode";
 import { renderUnlock } from "./src/ui.mjs";
 import { configPath } from "./src/config.mjs";
 
@@ -279,6 +280,41 @@ export function apply(ctx) {
 
   // The same settings as JSON, for the in-GUI settings section. Both surfaces
   // go through `applySettings`, so a change made in either one is identical.
+  /**
+   * Render one QR code as SVG.
+   *
+   * The phone has to open a URL containing a 43-character access key. Typing
+   * that is the worst part of pairing, so the server draws the code and the
+   * client only has to display it. Rendering here rather than in the browser
+   * is deliberate: the client half is served as plain JavaScript by the
+   * module loader and cannot import a package, while the host can.
+   */
+  async function apiQr(req, res) {
+    if (req.method !== "GET") {
+      json(res, 405, { error: "method not allowed" });
+      return;
+    }
+    const url = new URL(req.url ?? "/", "http://dsh-remote.invalid");
+    const value = url.searchParams.get("text") ?? "";
+    if (value === "" || value.length > 2048) {
+      text(res, 400, "text query parameter required (1..2048 chars)\n");
+      return;
+    }
+    try {
+      const svg = await QRCode.toString(value, {
+        type: "svg",
+        margin: 1,
+        width: 240,
+        errorCorrectionLevel: "M",
+        color: { light: "#ffffff", dark: "#000000" },
+      });
+      res.writeHead(200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "no-store" });
+      res.end(svg);
+    } catch (error) {
+      text(res, 500, `qr: ${error.message}\n`);
+    }
+  }
+
   /** Attach project discovery without letting a failure break the whole reply. */
   async function withProjects(payload) {
     try {
@@ -354,6 +390,10 @@ export function apply(ctx) {
     () => ctx.webServer.register({ kind: "exact", path: "/remote/api/sync", handler: apiSync }),
     "dsh-remote: project sync api",
   );
+  ctx.effect(
+    () => ctx.webServer.register({ kind: "exact", path: "/remote/api/qr", handler: apiQr }),
+    "dsh-remote: qr api",
+  );
 
   // ── the public listener ───────────────────────────────────────────────────
   const server = createServer(async (req, res) => {
@@ -399,6 +439,10 @@ export function apply(ctx) {
       }
       if (path === "/remote/api/sync") {
         await apiSync(req, res);
+        return;
+      }
+      if (path === "/remote/api/qr") {
+        await apiQr(req, res);
         return;
       }
       if (path === "/remote/rotate") {

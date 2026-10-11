@@ -79,6 +79,25 @@ window.__ModuleLoader__.load({
       return h("div", null, h("label", null, label), children);
     }
 
+    /**
+     * The pairing code for one URL.
+     *
+     * The server draws it: this half is loaded as plain JavaScript by the
+     * module loader and cannot import the encoder. Scanning beats typing a
+     * forty-three-character key on a phone keyboard.
+     */
+    function Qr({ url }) {
+      return h("div", { className: "dshp-qrbox" },
+        h("img", {
+          className: "dshp-qr",
+          src: "/remote/api/qr?text=" + encodeURIComponent(url),
+          alt: "扫码打开",
+          loading: "lazy",
+        }),
+        h("span", { className: "dshp-note" }, "手机相机直接扫这个，不用输密钥。")
+      );
+    }
+
     function RemoteAccess() {
       const [state, setState] = useState(null);
       const [draft, setDraft] = useState(null);

@@ -29,7 +29,9 @@
   "engines": {
     "node": ">=22.15"
   },
-  "dependencies": {},
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
   "keywords": [
     "dsh",
     "deepseek-harness",

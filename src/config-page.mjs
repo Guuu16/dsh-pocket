@@ -48,6 +48,7 @@ button:hover { filter:brightness(1.1); }
 button:active { transform:translateY(1px); }
 button:disabled { opacity:.6; cursor:default; }
 form.inline { display:inline; }
+.qr { display:block; width:132px; height:132px; margin:10px 0 4px; border-radius:10px; background:#ffffff; padding:6px; }
 .url { display:block; padding:10px 12px; border-radius:10px; background:var(--bg); border:1px solid var(--line);
   font-family:ui-monospace, Menlo, monospace; font-size:12.5px; margin:8px 0; word-break:break-all; }
 .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:var(--dim); }
@@ -73,13 +74,15 @@ export function renderConfigPage(input) {
   const mode = relay.mode ?? "off";
   const key = store.accessKey ?? "";
 
+  /** One QR image tag; the encoder lives on the host, not in this page. */
+  const qr = (value) => `<img class="qr" src="/remote/api/qr?text=${encodeURIComponent(value)}" alt="扫码打开" loading="lazy">`;
   const lanBlock = (status.lanUrls ?? []).length === 0
     ? '<div class="note">没有检测到局域网地址。</div>'
-    : (status.lanUrls ?? []).map((url) => `<span class="url">${esc(url)}/?k=${esc(key)}</span>`).join("");
+    : (status.lanUrls ?? []).map((url, index) => `<span class="url">${esc(url)}/?k=${esc(key)}</span>${index === 0 ? qr(`${url}/?k=${key}`) : ""}`).join("");
 
   const publicBlock = status.publicUrl === undefined
     ? '<div class="note">尚未建立公网入口。</div>'
-    : `<span class="url">${esc(status.publicUrl)}/?k=${esc(key)}</span>`;
+    : `<span class="url">${esc(status.publicUrl)}/?k=${esc(key)}</span>${qr(`${status.publicUrl}/?k=${key}`)}`;
 
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
