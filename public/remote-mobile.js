@@ -18,23 +18,31 @@
   var MIN_TARGET = 44;
 
   /**
-   * Grow the icon rail's controls to a finger-sized target.
+   * Give the icon rail's controls a finger-sized height.
    *
-   * Only elements already pinned to the left edge and smaller than the target
-   * are touched, so nothing in the conversation area is affected.
+   * Height only, and that is not a detail: this used to set `minWidth` too,
+   * which measured 35px-wide sidebar rows being stretched to 44 inside their
+   * own 35px lane (clientWidth 35 / scrollWidth 44 on logoRow, panelList and
+   * sectionHeader), so the frame grew to 780px inside a 390px viewport. The
+   * `x <= 80` guard below does not exclude the sidebar — it opens at the left
+   * edge — so every one of those rows got the inline style.
+   *
+   * An inline style also outranks the stylesheet, so fixing the CSS alone
+   * changed nothing.
    */
   function enlargeRailTargets() {
     var nodes = document.querySelectorAll('button[aria-label], [role="button"][aria-label]');
     for (var i = 0; i < nodes.length; i += 1) {
       var el = nodes[i];
-      if (el.dataset.dshpSized === "1") continue;
+      if (el.dataset.dshrSized === "1") continue;
       var r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
-      if (r.x > 80) continue; // not the rail
-      if (r.width >= MIN_TARGET && r.height >= MIN_TARGET) continue;
-      el.style.minWidth = MIN_TARGET + "px";
+      if (r.height >= MIN_TARGET) {
+        el.dataset.dshrSized = "1";
+        continue;
+      }
       el.style.minHeight = MIN_TARGET + "px";
-      el.dataset.dshpSized = "1";
+      el.dataset.dshrSized = "1";
     }
   }
 
