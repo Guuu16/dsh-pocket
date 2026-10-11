@@ -33,9 +33,12 @@ h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(-
 label { display:block; font-size:13px; color:var(--dim); margin:14px 0 5px; }
 input, select { width:100%; height:40px; padding:0 11px; border:1px solid var(--line); border-radius:9px;
   background:var(--bg); color:var(--fg); font:inherit; font-size:14px; }
-button { height:42px; padding:0 18px; border:0; border-radius:10px; background:var(--accent); color:#fff;
+button { height:42px; padding:0 18px; border:1px solid transparent; border-radius:10px; background:var(--accent); color:#fff;
   font:inherit; font-weight:600; cursor:pointer; }
-button.ghost { background:transparent; border:1px solid var(--line); color:var(--fg); font-weight:400; }
+button.ghost { background:var(--panel); border-color:var(--line); color:var(--fg); font-weight:500; }
+button:hover { filter:brightness(1.08); }
+button:active { transform:translateY(1px); }
+button:disabled { opacity:.6; cursor:default; }
 form.inline { display:inline; }
 .url { display:block; padding:10px 12px; border-radius:10px; background:var(--bg); border:1px solid var(--line);
   font-family:ui-monospace, Menlo, monospace; font-size:12.5px; margin:8px 0; word-break:break-all; }
@@ -142,5 +145,46 @@ export function renderConfigPage(input) {
 <div class="note">访问密钥是唯一的门禁。不装这个插件、没有这把密钥，任何人都进不来。</div>
 </div>
 
-</div></body></html>`;
+<div id="dshp-error" class="note" style="display:none;color:var(--warn)"></div>
+
+</div>
+<script>
+/* Submit in place. A native form POST navigates (and a page opened with ?k=
+   would lose its key), so intercept it: fetch, then swap the document without
+   touching the URL. With JS off the plain form still works. */
+(function () {
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    event.preventDefault();
+
+    var button = form.querySelector("button[type=submit]");
+    var label = button ? button.textContent : "";
+    if (button) { button.disabled = true; button.textContent = "处理中…"; }
+
+    fetch(form.action, {
+      method: "POST",
+      body: new URLSearchParams(new FormData(form)).toString(),
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      credentials: "same-origin"
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.text();
+    }).then(function (html) {
+      try {
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (error) {
+        location.reload();
+      }
+    }).catch(function (error) {
+      if (button) { button.disabled = false; button.textContent = label; }
+      var note = document.getElementById("dshp-error");
+      if (note) { note.textContent = "保存失败：" + error.message; note.style.display = "block"; }
+    });
+  });
+})();
+</script>
+</body></html>`;
 }
