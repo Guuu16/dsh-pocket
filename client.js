@@ -310,9 +310,11 @@ window.__ModuleLoader__.load({
             h("h3", null, healthy
               ? `项目 · ${registered.length} 个，全部可用`
               : `项目 · ${missing.length + orphans.length} 个有问题`),
-            h("p", { className: "dshr-note" }, missing.length === 0
-              ? `磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。`
-              : `磁盘上有 ${projects.total} 个目录的历史记录，其中 ${missing.length} 个没进 dsh 的工作区列表，打开侧边栏看不到它们，${pending} 个会话也一起看不见：`),
+            h("p", { className: "dshr-note" }, missing.length > 0
+              ? `磁盘上有 ${projects.total} 个目录的历史记录，其中 ${missing.length} 个没进 dsh 的工作区列表，打开侧边栏看不到它们，${pending} 个会话也一起看不见：`
+              : orphans.length > 0
+                ? `磁盘上有历史记录的 ${projects.total} 个目录都已有对应的工作区，但下面 ${orphans.length} 个的目录已经不在了。`
+                : `磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。`),
             orphans.length === 0 ? null : h("p", { className: "dshr-err" },
               `${orphans.length} 个工作区的目录已经不在了：${orphans.map((o) => o.title).join("、")}`),
             h("div", { className: "dshr-plist" }, rows),
