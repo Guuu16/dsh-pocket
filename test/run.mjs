@@ -311,4 +311,64 @@ section('manifest');
   check('and the manifest link', head.includes('rel="manifest"'));
 }
 
+
+
+// ── proxy response headers ──────────────────────────────────────────────────
+// Kept last because it binds real sockets.
+section('proxy');
+{
+  const { createServer, request } = await import('node:http');
+  const { createProxy } = await import(new URL('src/proxy.mjs', ROOT).href);
+
+  // An upstream that answers like dsh does for a document: chunked, because it
+  // never computes a length. This is the shape that produced the invalid pair.
+  let sawChunked = false;
+  const upstream = createServer((req, res) => {
+    sawChunked = true;
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.write('<html><head><title>up</title></head><body>hello</body></html>');
+    res.end();
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const upstreamPort = upstream.address().port;
+
+  const proxy = createProxy({
+    port: upstreamPort,
+    authority: `127.0.0.1:${upstreamPort}`,
+    cookie: () => undefined,
+    tapHtml: (html) => html.replace('</head>', '<meta name="tapped" content="1"></head>'),
+  });
+  const gateway = createServer((req, res) => proxy.handleHttp(req, res));
+  await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
+  const gatewayPort = gateway.address().port;
+
+  const result = await new Promise((resolve) => {
+    const req = request({ host: '127.0.0.1', port: gatewayPort, path: '/', headers: { connection: 'close' } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', (e) => resolve({ error: e.message }));
+    req.end();
+  });
+
+  check('the upstream really answered chunked', sawChunked && result.headers?.transport === undefined);
+  check('the response arrives at all (strict clients used to reject it)',
+    result.error === undefined, result.error);
+  check('no transfer-encoding is left alongside content-length',
+    result.headers?.['transfer-encoding'] === undefined,
+    `transfer-encoding=${result.headers?.['transfer-encoding']}`);
+  check('content-length matches the rewritten body',
+    Number(result.headers?.['content-length']) === Buffer.byteLength(result.body ?? '', 'utf8'),
+    `declared=${result.headers?.['content-length']} actual=${Buffer.byteLength(result.body ?? '', 'utf8')}`);
+  check('the tap still ran', (result.body ?? '').includes('name="tapped"'));
+  check('content-encoding was dropped because the body is now plain text',
+    result.headers?.['content-encoding'] === undefined);
+  check('the two header names are never both present',
+    !(result.headers?.['content-length'] !== undefined && result.headers?.['transfer-encoding'] !== undefined));
+
+  gateway.close();
+  upstream.close();
+}
+
 process.exit(report() ? 0 : 1);

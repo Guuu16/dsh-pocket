@@ -9,24 +9,46 @@
  * Run: node test/verify-live.mjs [gateway-port]
  */
 
+import { request as httpRequest } from 'node:http';
+
 const PORT = Number(process.argv[2] ?? 8787);
 const BASE = `http://127.0.0.1:${PORT}`;
 const checks = [];
 
+/**
+ * One raw HTTP request.
+ *
+ * Deliberately node:http rather than fetch: fetch failed against this gateway
+ * with a generic "fetch failed" while curl returned 200 on the same URL, and a
+ * probe that cannot say why it failed is not worth having.
+ */
+function request(path, { method = 'GET' } = {}) {
+  return new Promise((resolve) => {
+    const req = httpRequest(
+      { host: '127.0.0.1', port: PORT, path, method, headers: { connection: 'close' } },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] ?? '', body: Buffer.concat(chunks).toString('utf8') }));
+        res.on('error', (e) => resolve({ status: 0, type: '', body: '', error: e.message }));
+      },
+    );
+    req.on('error', (e) => resolve({ status: 0, type: '', body: '', error: e.message }));
+    req.end();
+  });
+}
+
 async function probe(path, { method = 'GET', expect, type } = {}) {
-  try {
-    const res = await fetch(BASE + path, { method, redirect: 'manual' });
-    const body = await res.text();
-    const typeOk = type === undefined || (res.headers.get('content-type') ?? '').includes(type);
-    checks.push({
-      name: `${method} ${path}`,
-      ok: res.status === expect && typeOk,
-      detail: `${res.status} ${res.headers.get('content-type') ?? ''}${typeOk ? '' : ' (wrong content-type)'}`,
-      body,
-    });
-  } catch (error) {
-    checks.push({ name: `${method} ${path}`, ok: false, detail: `unreachable: ${error.message}` });
-  }
+  const res = await request(path, { method });
+  const typeOk = type === undefined || res.type.includes(type);
+  checks.push({
+    name: `${method} ${path}`,
+    ok: res.status === expect && typeOk,
+    detail: res.error !== undefined
+      ? `unreachable: ${res.error}`
+      : `${res.status} ${res.type || '(no content-type)'}${typeOk ? '' : ' (wrong content-type)'}`,
+    body: res.body,
+  });
 }
 
 await probe('/', { expect: 200, type: 'text/html' });

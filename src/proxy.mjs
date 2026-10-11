@@ -140,6 +140,13 @@ export function createProxy(options) {
           const buffer = Buffer.from(options.tapHtml(text), "utf8");
           delete headers["content-encoding"];
           delete headers.etag;
+          // The body is now a known-length buffer, so it must not also claim to
+          // be chunked. Upstream headers are copied wholesale, and dsh sends
+          // `transfer-encoding: chunked`; leaving both makes the response
+          // invalid — Node's HTTP client rejects it outright with "Content-Length
+          // can't be present with Transfer-Encoding", and a strict client on the
+          // phone would too. curl tolerates it, which is why it went unnoticed.
+          delete headers["transfer-encoding"];
           headers["content-length"] = String(buffer.byteLength);
           res.writeHead(upstreamRes.statusCode ?? 502, headers);
           res.end(buffer);
