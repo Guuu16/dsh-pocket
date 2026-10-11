@@ -471,4 +471,119 @@ section('proxy protocol edges');
   upstream.close();
 }
 
+// ── the path dsh actually carries its RPC over ──────────────────────────────
+section('proxy websocket upgrade');
+{
+  const { createServer } = await import('node:http');
+  const { connect } = await import('node:net');
+  const { createHash } = await import('node:crypto');
+  const { createProxy } = await import(new URL('src/proxy.mjs', ROOT).href);
+
+  // An upstream that performs a real handshake and then echoes one frame.
+  let sawUpgrade = false;
+  const upstream = createServer((req, res) => { res.writeHead(400); res.end(); });
+  upstream.on('upgrade', (req, socket, head) => {
+    sawUpgrade = true;
+    const key = req.headers['sec-websocket-key'];
+    const accept = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+    socket.write(
+      'HTTP/1.1 101 Switching Protocols\r\n' +
+      'Upgrade: websocket\r\n' +
+      'Connection: Upgrade\r\n' +
+      `Sec-WebSocket-Accept: ${accept}\r\n\r\n`,
+    );
+    if (head.length > 0) socket.write(head);
+    socket.on('data', (d) => socket.write(d));   // echo
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const upstreamPort = upstream.address().port;
+
+  const proxy = createProxy({
+    port: upstreamPort,
+    authority: `127.0.0.1:${upstreamPort}`,
+    cookie: () => 'session=injected',
+  });
+  const gateway = createServer((req, res) => { res.writeHead(404); res.end(); });
+  gateway.on('upgrade', (req, socket, head) => proxy.handleUpgrade(req, socket, head));
+  await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
+  const gatewayPort = gateway.address().port;
+
+  const result = await new Promise((resolve) => {
+    const socket = connect(gatewayPort, '127.0.0.1', () => {
+      socket.write(
+        'GET /api/remote.mux HTTP/1.1\r\n' +
+        `Host: 127.0.0.1:${gatewayPort}\r\n` +
+        'Upgrade: websocket\r\n' +
+        'Connection: Upgrade\r\n' +
+        'Sec-WebSocket-Version: 13\r\n' +
+        'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n',
+      );
+    });
+    let data = '';
+    socket.on('data', (d) => {
+      data += d.toString('latin1');
+      if (data.includes('\r\n\r\n') && !data.startsWith('HTTP/1.1 101')) {
+        socket.destroy();
+        resolve({ handshake: data.split('\r\n')[0], echoed: false });
+      }
+      if (data.includes('\r\n\r\n') && data.includes('PING-ECHO') === false) {
+        // handshake done; send a payload the upstream should echo back
+        socket.write('PING-ECHO');
+      }
+      if (data.includes('PING-ECHO') && data.indexOf('PING-ECHO') !== data.lastIndexOf('PING-ECHO')) {
+        socket.destroy();
+        resolve({ handshake: data.split('\r\n')[0], echoed: true });
+      }
+    });
+    socket.on('error', (e) => resolve({ handshake: 'ERR ' + e.message, echoed: false }));
+    setTimeout(() => { socket.destroy(); resolve({ handshake: data.split('\r\n')[0] || '(timeout)', echoed: data.includes('PING-ECHO') }); }, 6000);
+  });
+
+  check('the upgrade reaches the upstream', sawUpgrade);
+  check('the client sees 101 Switching Protocols', result.handshake.includes('101'), result.handshake);
+  check('bytes flow in both directions after the handshake', result.echoed);
+
+  gateway.close();
+  upstream.close();
+}
+
+section('large response');
+{
+  const { createServer, request } = await import('node:http');
+  const { createProxy } = await import(new URL('src/proxy.mjs', ROOT).href);
+
+  // A big binary body, the shape of a plugin bundle crossing the gateway.
+  const SIZE = 4 * 1024 * 1024;
+  const upstream = createServer((req, res) => {
+    const payload = Buffer.alloc(SIZE, 0x41);
+    res.writeHead(200, { 'content-type': 'application/javascript', 'content-length': String(SIZE) });
+    res.end(payload);
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const upstreamPort = upstream.address().port;
+
+  const proxy = createProxy({ port: upstreamPort, authority: `127.0.0.1:${upstreamPort}`, cookie: () => undefined });
+  const gateway = createServer((req, res) => proxy.handleHttp(req, res));
+  await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
+  const gatewayPort = gateway.address().port;
+
+  const got = await new Promise((resolve) => {
+    const req = request({ host: '127.0.0.1', port: gatewayPort, path: '/big.js', agent: false }, (res) => {
+      let bytes = 0;
+      res.on('data', (c) => { bytes += c.length; });
+      res.on('end', () => resolve({ status: res.statusCode, bytes, declared: Number(res.headers['content-length']) }));
+      res.on('error', (e) => resolve({ error: e.message }));
+    });
+    req.on('error', (e) => resolve({ error: e.message }));
+    req.end();
+  });
+
+  check('a 4MB body passes through whole', got.bytes === SIZE, `${got.bytes} of ${SIZE}`);
+  check('its declared length is preserved', got.declared === SIZE, String(got.declared));
+  check('it is not re-encoded', got.error === undefined, got.error);
+
+  gateway.close();
+  upstream.close();
+}
+
 process.exit(report() ? 0 : 1);
