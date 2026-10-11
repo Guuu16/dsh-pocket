@@ -52,6 +52,10 @@ window.__ModuleLoader__.load({
 .dshp button:disabled { opacity: .55; cursor: default; }
 .dshp-note { font-size: 12px; color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshp-err { font-size: 12.5px; color: #ff7a7a; }
+.dshp-ok { color: #3fb27f; font-weight: 600; }
+.dshp-bad { color: #ff7a7a; }
+.dshp-wait { color: #d9a441; }
+.dshp-ok-card { border-color: #3fb27f !important; }
 .dshp-url { display: block; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; word-break: break-all;
   font-family: ui-monospace, Menlo, monospace; background: var(--dsw-alias-bg-layer-2, #1b2130);
   border: 1px solid var(--dsw-alias-border-l1, #252b36); color: var(--dsw-alias-label-primary, #e7ebf3); }
@@ -134,7 +138,8 @@ window.__ModuleLoader__.load({
           });
           if (!res.ok) throw new Error("HTTP " + res.status);
           adopt(await res.json(), true);
-          setNote("已保存，正在连接中继…");
+          // No fixed message here: the status strip below is derived from the
+          // live tunnel state, so it reports progress and success by itself.
         } catch (e) {
           setError("保存失败：" + e.message);
         } finally {
@@ -163,7 +168,18 @@ window.__ModuleLoader__.load({
 
       const set = (patch) => setDraft(Object.assign({}, draft, patch));
       const key = state.accessKey;
-      const publicUrl = state.status.publicUrl;
+      const status = state.status;
+      const publicUrl = status.publicUrl;
+      const tunnelUp = status.tunnel === "up";
+      const tunnelFailed = status.tunnel === "失败" || status.tunnel === "端口被拒";
+
+      /* Derived from the live status on every render, so it can never get stuck:
+         the poll keeps updating status, and this line follows it. */
+      const tunnelLine = tunnelUp
+        ? h("span", { className: "dshp-ok" }, "✓ 已连接")
+        : tunnelFailed
+          ? h("span", { className: "dshp-bad" }, "✗ " + (status.error === undefined ? "连接失败" : status.error))
+          : h("span", { className: "dshp-wait" }, (status.tunnel === "关闭" ? "未启用" : status.tunnel) + "…");
 
       return h("div", { className: "dshp" },
         h("style", null, CSS),
@@ -171,9 +187,8 @@ window.__ModuleLoader__.load({
         h("p", null, "手机访问的就是 dsh 本身的界面——同一份工作区、同一份聊天记录。这里配置从外网进来的路径。"),
 
         h("div", { className: "dshp-card" },
-          Row({ label: "网关", children: h(Pill, { on: state.status.gateway === "listening" }, state.status.gateway === "listening" ? "监听中 :" + state.port : state.status.gateway) }),
-          Row({ label: "中继隧道", children: h(Pill, { on: state.status.tunnel === "up" }, state.status.tunnel) }),
-          state.status.error ? h("div", { className: "dshp-err" }, state.status.error) : null,
+          Row({ label: "网关", children: h(Pill, { on: status.gateway === "listening" }, status.gateway === "listening" ? "监听中 :" + state.port : status.gateway) }),
+          Row({ label: "中继隧道", children: tunnelLine }),
           Row({ label: "访问密钥", children: h("span", { className: "dshp-v" }, key) }),
           h("div", { className: "dshp-actions" },
             h("button", { type: "button", onClick: rotate, disabled: busy }, "换一把密钥"),
@@ -181,20 +196,22 @@ window.__ModuleLoader__.load({
           )
         ),
 
+        h("div", { className: "dshp-card" + (tunnelUp ? " dshp-ok-card" : "") },
+          h("h3", null, tunnelUp ? "公网地址 · 已就绪" : "公网地址"),
+          publicUrl
+            ? h("code", { className: "dshp-url" }, publicUrl + "/?k=" + key)
+            : h("p", null, tunnelFailed ? "没有拿到公网地址。" : "尚未建立公网入口。"),
+          h("p", { className: "dshp-note" }, tunnelUp
+            ? "把上面这一整行（含 ?k=）发到手机上打开，然后加进主屏。"
+            : "不在同一网络时用这个。必须带 ?k=，第一次打开会换成 cookie。")
+        ),
+
         h("div", { className: "dshp-card" },
           h("h3", null, "局域网地址"),
           state.lanUrls.length === 0
             ? h("p", null, "没有检测到局域网地址。")
             : state.lanUrls.map((url, i) => h("code", { className: "dshp-url", key: i }, url + "/?k=" + key)),
-          h("p", { className: "dshp-note" }, "手机和这台机器同一个 WiFi 时直接用这个。")
-        ),
-
-        h("div", { className: "dshp-card" },
-          h("h3", null, "公网地址"),
-          publicUrl
-            ? h("code", { className: "dshp-url" }, publicUrl + "/?k=" + key)
-            : h("p", null, "尚未建立公网入口。"),
-          h("p", { className: "dshp-note" }, "不在同一网络时用这个。必须带 ?k=，第一次打开会换成 cookie。")
+          h("p", { className: "dshp-note" }, "手机和这台机器同一个 WiFi 时直接用这个，最快。")
         ),
 
         h("div", { className: "dshp-card" },
