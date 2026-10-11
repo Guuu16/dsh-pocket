@@ -83,8 +83,18 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState("");
       const timer = useRef(undefined);
 
-      const adopt = useCallback((data) => {
+      /**
+       * Take a server snapshot.
+       *
+       * `syncDraft` is the whole point: the status strip polls every few
+       * seconds, and populating the form from a poll would overwrite whatever
+       * the user is editing — a selection made in the dropdown would spring
+       * back to the stored value within one poll interval. Only the initial
+       * load and an explicit save may touch the form.
+       */
+      const adopt = useCallback((data, syncDraft) => {
         setState(data);
+        if (syncDraft !== true) return;
         setDraft({
           mode: data.relay.mode,
           host: data.relay.host,
@@ -95,21 +105,19 @@ window.__ModuleLoader__.load({
         });
       }, []);
 
-      const load = useCallback(async () => {
+      const load = useCallback(async (syncDraft) => {
         try {
           const res = await fetch("/pocket/api/config", { credentials: "same-origin" });
           if (!res.ok) throw new Error("HTTP " + res.status);
-          adopt(await res.json());
+          adopt(await res.json(), syncDraft);
         } catch (e) {
           setError("读取配置失败：" + e.message);
         }
       }, [adopt]);
 
       useEffect(() => {
-        load();
-        // The tunnel comes up asynchronously; poll while the page is open so the
-        // public URL appears without the user reloading.
-        timer.current = setInterval(load, 4000);
+        load(true);
+        timer.current = setInterval(() => load(false), 4000);
         return () => clearInterval(timer.current);
       }, [load]);
 
@@ -125,7 +133,7 @@ window.__ModuleLoader__.load({
             body: JSON.stringify(draft),
           });
           if (!res.ok) throw new Error("HTTP " + res.status);
-          adopt(await res.json());
+          adopt(await res.json(), true);
           setNote("已保存，正在连接中继…");
         } catch (e) {
           setError("保存失败：" + e.message);
@@ -140,7 +148,7 @@ window.__ModuleLoader__.load({
         try {
           const res = await fetch("/pocket/api/rotate", { method: "POST", credentials: "same-origin" });
           if (!res.ok) throw new Error("HTTP " + res.status);
-          adopt(await res.json());
+          adopt(await res.json(), false);
           setNote("已换新密钥，之前配对的设备全部失效。");
         } catch (e) {
           setError("换密钥失败：" + e.message);
