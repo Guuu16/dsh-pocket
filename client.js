@@ -23,51 +23,64 @@ window.__ModuleLoader__.load({
        is an invalid declaration and the button falls back to a white UA
        default with white text. */
     const CSS = `
-.dshp { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 32px; max-width: 620px; }
-.dshp h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary, #e7ebf3); }
-.dshp p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--dsw-alias-label-secondary, #8b95a7); }
+/* The root class was left as the pre-rename prefix, so none of these three
+   rules ever matched the root the component actually renders — no max-width,
+   no gap, no padding. A fixed-width QR then overflowed a 136px box. */
+.dshr, .dshr * { box-sizing: border-box; }
+.dshr { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 32px; max-width: 620px; min-width: 0; }
+.dshr h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary, #e7ebf3); }
+.dshr p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshr-card { padding: 14px 16px; border: 1px solid var(--dsw-alias-border-l1, #252b36); border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-1, #161a21); display: flex; flex-direction: column; gap: 10px; }
-.dshr-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.dshr-k { min-width: 92px; color: var(--dsw-alias-label-secondary, #8b95a7); }
+  background: var(--dsw-alias-bg-layer-1, #161a21); display: flex; flex-direction: column; gap: 10px;
+  min-width: 0; overflow-wrap: anywhere; }
+.dshr-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; flex-wrap: wrap; min-width: 0; }
+.dshr-k { flex: 0 0 auto; color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshr-v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
-  color: var(--dsw-alias-label-primary, #e7ebf3); word-break: break-all; }
+  color: var(--dsw-alias-label-primary, #e7ebf3); word-break: break-all; min-width: 0; overflow-wrap: anywhere; }
 .dshr-pill { padding: 1px 9px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l1, #252b36);
   font-size: 12px; color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshr-pill.on { color: #3fb27f; border-color: #3fb27f; }
 .dshr-pill.off { color: #d9a441; border-color: #d9a441; }
-.dshp label { display: block; font-size: 12.5px; color: var(--dsw-alias-label-secondary, #8b95a7); margin-bottom: 5px; }
-.dshp input, .dshp select { width: 100%; height: 34px; padding: 0 10px; font: inherit; font-size: 13px;
+.dshr label { display: block; font-size: 12.5px; color: var(--dsw-alias-label-secondary, #8b95a7); margin-bottom: 5px; }
+.dshr input, .dshr select { width: 100%; height: 34px; padding: 0 10px; font: inherit; font-size: 13px;
   color: var(--dsw-alias-label-primary, #e7ebf3); background: var(--dsw-alias-bg-layer-2, #1b2130);
   border: 1px solid var(--dsw-alias-border-l1, #252b36); border-radius: 8px; }
-.dshp input:focus, .dshp select:focus { outline: none; border-color: #3f63f5; }
+.dshr input:focus, .dshr select:focus { outline: none; border-color: #3f63f5; }
 .dshr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .dshr-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-.dshp button { height: 34px; padding: 0 14px; font: inherit; font-size: 13px; border-radius: 8px; cursor: pointer;
+.dshr button { height: 34px; padding: 0 14px; font: inherit; font-size: 13px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--dsw-alias-border-l1, #39445a); background: var(--dsw-alias-bg-layer-2, #1c2333);
   color: var(--dsw-alias-label-primary, #e8ecf5); }
-.dshp button.primary { background: #3f63f5 !important; border-color: #3f63f5 !important; color: #ffffff !important;
+.dshr button.primary { background: #3f63f5 !important; border-color: #3f63f5 !important; color: #ffffff !important;
   font-weight: 600; text-shadow: 0 1px 1px rgba(0,0,0,.22); }
-.dshp button:hover { filter: brightness(1.1); }
-.dshp button:disabled { opacity: .55; cursor: default; }
+.dshr button:hover { filter: brightness(1.1); }
+.dshr button:disabled { opacity: .55; cursor: default; }
 .dshr-note { font-size: 12px; color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshr-err { font-size: 12.5px; color: #ff7a7a; }
 .dshr-ok { color: #3fb27f; font-weight: 600; }
 .dshr-bad { color: #ff7a7a; }
 .dshr-wait { color: #d9a441; }
 .dshr-ok-card { border-color: #3fb27f !important; }
-.dshr-url { display: block; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; word-break: break-all;
+.dshr-url { display: block; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; word-break: break-all; min-width: 0; max-width: 100%;
   font-family: ui-monospace, Menlo, monospace; background: var(--dsw-alias-bg-layer-2, #1b2130);
   border: 1px solid var(--dsw-alias-border-l1, #252b36); color: var(--dsw-alias-label-primary, #e7ebf3); }
-.dshr-qrbox { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
-.dshr-qr { width: 124px; height: 124px; flex: none; border-radius: 10px; background: #ffffff; padding: 6px; }
-.dshr-plist { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.dshr-qrbox { display: flex; align-items: center; gap: 14px; margin-top: 4px; flex-wrap: wrap; min-width: 0; }
+.dshr-qr { width: 124px; height: 124px; max-width: 100%; flex: 0 0 auto; border-radius: 10px; background: #ffffff; padding: 6px; }
+/*
+ * These rows live inside whatever width the host's settings pane gives them.
+ * On a phone in portrait that measured 67px — the harness's nav takes the rest
+ * — and a fixed min-width on a title or a fixed-width QR box then pushed the
+ * content past its own container (16 overflowing elements, scrollWidth 150 in
+ * a 67px box). Everything below wraps or shrinks instead of asserting a width.
+ */
+.dshr-plist { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; min-width: 0; }
 .dshr-toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;
   color: var(--dsw-alias-label-secondary, #8b95a7); }
 .dshr-toggle input { width: 15px; height: 15px; accent-color: #3f63f5; cursor: pointer; }
-.dshr-pline { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.dshr-pline { display: flex; align-items: baseline; gap: 8px; font-size: 13px; flex-wrap: wrap; min-width: 0; }
 .dshr-ptitle { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
-  color: var(--dsw-alias-label-primary, #e7ebf3); min-width: 110px; }
+  color: var(--dsw-alias-label-primary, #e7ebf3); flex: 1 1 auto; min-width: 0;
+  overflow-wrap: anywhere; }
 .dshr-warn-card { border-color: #d9a441 !important; }
 `;
 
@@ -262,7 +275,7 @@ window.__ModuleLoader__.load({
       }, [draft, adopt, flashNote]);
 
       if (draft === null || state === null) {
-        return h("div", { className: "dshp" }, h("style", null, CSS), h("p", null, error === "" ? "加载中…" : error));
+        return h("div", { className: "dshr" }, h("style", null, CSS), h("p", null, error === "" ? "加载中…" : error));
       }
 
       const set = (patch) => setDraft(Object.assign({}, draft, patch));
@@ -280,7 +293,7 @@ window.__ModuleLoader__.load({
           ? h("span", { className: "dshr-bad" }, "✗ " + (status.error === undefined ? "连接失败" : status.error))
           : h("span", { className: "dshr-wait" }, (status.tunnel === "关闭" ? "未启用" : status.tunnel) + "…");
 
-      return h("div", { className: "dshp" },
+      return h("div", { className: "dshr" },
         h("style", null, CSS),
         h("h3", null, "远程访问"),
         h("p", null, "手机访问的就是 dsh 本身的界面——同一份工作区、同一份聊天记录。这里配置从外网进来的路径。"),

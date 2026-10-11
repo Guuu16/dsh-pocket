@@ -60,6 +60,19 @@ export function injectMobileShell(html) {
   if (html.includes('data-dsh-remote="mobile"')) return html;
 
   let out = html;
+
+  /*
+   * A document may only honour one manifest, and the first link wins. dsh
+   * ships its own — so appending ours produced two links, the browser took
+   * dsh's, and "add to home screen" installed the harness's icon and name
+   * instead of this plugin's. Remove the one that is already there.
+   *
+   * theme-color behaves the same way in practice (browsers differ on first vs
+   * last), so the harness's is dropped too.
+   */
+  out = out.replace(/<link[^>]*\brel=["']manifest["'][^>]*>/iu, "");
+  out = out.replace(/<meta[^>]*\bname=["']theme-color["'][^>]*>/iu, "");
+
   if (out.includes("</head>")) {
     out = out.replace("</head>", HEAD_SNIPPET + "</head>");
   } else {

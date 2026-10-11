@@ -99,6 +99,17 @@ section('inject.mjs');
   ]) check(`injects ${needle}`, once.includes(needle));
   check('idempotent', injectMobileShell(once) === once);
   check('keeps the original document', once.includes('<title>t</title>') && once.includes('>x<'));
+
+  // dsh ships its own manifest link, and the first one in a document wins.
+  const withHarness = '<html><head><link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#111"><title>t</title></head><body>x</body></html>';
+  const swapped = injectMobileShell(withHarness);
+  check('replaces the harness manifest instead of adding a second',
+    (swapped.match(/rel="manifest"/g) ?? []).length === 1, `${(swapped.match(/rel="manifest"/g) ?? []).length} links`);
+  check('the surviving manifest is this plugin\'s',
+    swapped.includes('href="/remote.webmanifest"') && !swapped.includes('./manifest.webmanifest'));
+  check('replaces the harness theme-color too',
+    (swapped.match(/name="theme-color"/g) ?? []).length === 1,
+    `${(swapped.match(/name="theme-color"/g) ?? []).length} meta tags`);
 }
 
 // ── routes ──────────────────────────────────────────────────────────────────
