@@ -46,5 +46,8 @@
     "url": "git+https://github.com/Guuu16/dsh-remote.git"
   },
   "homepage": "https://github.com/Guuu16/dsh-remote#readme",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/run.mjs"
+  }
 }
