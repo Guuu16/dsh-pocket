@@ -2,27 +2,34 @@
  * Gateway configuration and access control.
  *
  * The access key is the pairing secret: it is generated once, stored under
- * `~/.dsh-pocket/config.json`, and exchanged for an HttpOnly cookie on first
+ * `~/.dsh-remote/config.json`, and exchanged for an HttpOnly cookie on first
  * use so the key never rides along in page URLs afterwards. Loopback requests
  * are trusted without it, because a process on this machine already has full
  * filesystem access to the same data.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const COOKIE = "dsh-pocket";
+const COOKIE = "dsh-remote";
 
 /** Directory holding gateway state, separate from the dsh home. */
-export function pocketHome() {
-  return process.env.DSH_POCKET_HOME ?? join(homedir(), ".dsh-pocket");
+export function remoteHome() {
+  if (typeof process.env.DSH_REMOTE_HOME === "string" && process.env.DSH_REMOTE_HOME !== "") {
+    return process.env.DSH_REMOTE_HOME;
+  }
+  const current = join(homedir(), ".dsh-remote");
+  if (existsSync(current)) return current;
+  const legacy = join(homedir(), ".dsh-pocket");
+  if (existsSync(legacy)) return legacy;
+  return current;
 }
 
 /** Absolute path of the gateway config file. */
 export function configPath() {
-  return join(pocketHome(), "config.json");
+  return join(remoteHome(), "config.json");
 }
 
 function randomKey() {
@@ -62,7 +69,7 @@ export function loadConfig() {
   };
 
   try {
-    mkdirSync(pocketHome(), { recursive: true, mode: 0o700 });
+    mkdirSync(remoteHome(), { recursive: true, mode: 0o700 });
     writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   } catch (error) {
     throw new Error(`cannot write ${path}: ${error.message}`);
@@ -82,14 +89,14 @@ function signature(secret, body) {
  * @param {number} days - cookie lifetime.
  * @returns {string} `name=value` pair without attributes.
  */
-export function mintPocketCookie(accessKey, days) {
+export function mintRemoteCookie(accessKey, days) {
   const issuedAt = Date.now();
   const body = Buffer.from(JSON.stringify({ v: 1, issuedAt, expiresAt: issuedAt + days * 86_400_000 })).toString("base64url");
   return `${COOKIE}=${body}.${signature(accessKey, body)}`;
 }
 
 /** Cookie attributes for the phone session. */
-export function pocketCookieAttributes(days) {
+export function remoteCookieAttributes(days) {
   return `Max-Age=${days * 86_400}; Path=/; HttpOnly; SameSite=Lax`;
 }
 
@@ -160,7 +167,7 @@ export function authorize(request, accessKey) {
     }
   }
 
-  const query = new URL(request.url ?? "/", "http://pocket.invalid").searchParams.get("k");
+  const query = new URL(request.url ?? "/", "http://dsh-remote.invalid").searchParams.get("k");
   if (typeof query === "string" && query !== "") {
     const actual = Buffer.from(query);
     const want = Buffer.from(accessKey);

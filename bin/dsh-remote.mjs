@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dsh-pocket — a phone gateway for the local DeepSeek Harness runtime.
+ * dsh-remote — a phone gateway for the local DeepSeek Harness runtime.
  *
  * It does three things:
  *   1. binds 0.0.0.0 so a phone on the same network can reach the runtime at all
@@ -11,7 +11,7 @@
  *      place every project and every historical session is recorded.
  *
  * Usage:
- *   node bin/dsh-pocket.mjs [--port 8787] [--host 0.0.0.0] [--dsh-port 19387]
+ *   node bin/dsh-remote.mjs [--port 8787] [--host 0.0.0.0] [--dsh-port 19387]
  *                           [--print-access-url] [--rotate-key]
  */
 
@@ -24,9 +24,9 @@ import {
   authorize,
   configPath,
   loadConfig,
-  mintPocketCookie,
+  mintRemoteCookie,
   persistTunnel,
-  pocketCookieAttributes,
+  remoteCookieAttributes,
   rotateAccessKey,
 } from "../src/config.mjs";
 import { lanAddresses, readAuthSecret, resolveDshWeb, signSessionCookie } from "../src/dsh.mjs";
@@ -52,12 +52,12 @@ const VERSION = "0.1.0";
 
 /** Static files this gateway serves itself, with their content types. */
 const ASSET_TYPES = {
-  "pocket.css": "text/css; charset=utf-8",
-  "pocket.js": "text/javascript; charset=utf-8",
-  "pocket.svg": "image/svg+xml",
-  "pocket.webmanifest": "application/manifest+json",
-  "pocket-mobile.css": "text/css; charset=utf-8",
-  "pocket-mobile.js": "text/javascript; charset=utf-8",
+  "remote.css": "text/css; charset=utf-8",
+  "remote.js": "text/javascript; charset=utf-8",
+  "remote.svg": "image/svg+xml",
+  "remote.webmanifest": "application/manifest+json",
+  "remote-mobile.css": "text/css; charset=utf-8",
+  "remote-mobile.js": "text/javascript; charset=utf-8",
 };
 const STOCK_ASSETS = new Set(Object.keys(ASSET_TYPES).map((name) => `/${name}`));
 
@@ -94,7 +94,7 @@ function parseArgs(argv) {
   return options;
 }
 
-const HELP = `dsh-pocket ${VERSION} — reach the local DeepSeek Harness runtime from a phone
+const HELP = `dsh-remote ${VERSION} — reach the local DeepSeek Harness runtime from a phone
 
   --port <n>             gateway port (default 8787)
   --host <addr>          gateway bind address (default 0.0.0.0)
@@ -139,7 +139,7 @@ async function main() {
 
   if (options.rotateKey) {
     const next = rotateAccessKey();
-    process.stdout.write(`dsh-pocket: new access key issued in ${configPath()}\n`);
+    process.stdout.write(`dsh-remote: new access key issued in ${configPath()}\n`);
     for (const address of [ "127.0.0.1", ...lanAddresses() ]) {
       process.stdout.write(`  http://${address}:${next.port}/?k=${next.accessKey}\n`);
     }
@@ -162,7 +162,7 @@ async function main() {
   try {
     dsh = await resolveDshWeb({ explicitPort: dshPort });
   } catch (error) {
-    process.stderr.write(`dsh-pocket: ${error.message}\n`);
+    process.stderr.write(`dsh-remote: ${error.message}\n`);
     process.exitCode = 1;
     return;
   }
@@ -179,7 +179,7 @@ async function main() {
     cookie: () => signSessionCookie(dsh.authority, secret, { days: config.cookieDays }),
     tapHtml: injectMobileShell,
     onUpgradeError: (error) => {
-      process.stderr.write(`dsh-pocket: websocket relay error: ${error.message}\n`);
+      process.stderr.write(`dsh-remote: websocket relay error: ${error.message}\n`);
     },
   });
 
@@ -196,7 +196,7 @@ async function main() {
 
   const server = createServer(async (request, response) => {
     try {
-      const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "pocket.invalid"}`);
+      const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "dsh-remote.invalid"}`);
       const path = url.pathname;
 
       const decision = authorize(request, config.accessKey);
@@ -205,7 +205,7 @@ async function main() {
           html(response, 401, renderUnlock({ days: config.cookieDays, configPath: configPath() }));
           return;
         }
-        text(response, 401, "dsh-pocket: unauthorized. Open the URL printed by dsh-pocket, or add ?k=<access-key>.\n");
+        text(response, 401, "dsh-remote: unauthorized. Open the URL printed by dsh-remote, or add ?k=<access-key>.\n");
         return;
       }
 
@@ -213,7 +213,7 @@ async function main() {
         // Exchange the URL key for a cookie and clean the address bar.
         response.writeHead(303, {
           location: path,
-          "set-cookie": `${mintPocketCookie(config.accessKey, config.cookieDays)}; ${pocketCookieAttributes(config.cookieDays)}`,
+          "set-cookie": `${mintRemoteCookie(config.accessKey, config.cookieDays)}; ${remoteCookieAttributes(config.cookieDays)}`,
           "cache-control": "no-store",
           "referrer-policy": "no-referrer",
         });
@@ -242,7 +242,7 @@ async function main() {
         return;
       }
 
-      if (path === "/pocket" || path === "/pocket/") {
+      if (path === "/remote" || path === "/remote/") {
         const projects = listProjects();
         html(response, 200, renderHome({
           projects,
@@ -326,7 +326,7 @@ async function main() {
       proxy.handleHttp(request, response);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`dsh-pocket: request failed: ${message}\n`);
+      process.stderr.write(`dsh-remote: request failed: ${message}\n`);
       if (response.headersSent) {
         response.destroy();
         return;
@@ -341,14 +341,14 @@ async function main() {
   server.on("connection", (socket) => {
     socket.on("error", (error) => {
       if (error.code !== "ECONNRESET" && error.code !== "EPIPE") {
-        process.stderr.write(`dsh-pocket: socket error: ${error.message}\n`);
+        process.stderr.write(`dsh-remote: socket error: ${error.message}\n`);
       }
     });
   });
 
   server.on("clientError", (error, socket) => {
     if (error.code !== "ECONNRESET" && error.code !== "HPE_INVALID_EOF_STATE") {
-      process.stderr.write(`dsh-pocket: client error: ${error.message}\n`);
+      process.stderr.write(`dsh-remote: client error: ${error.message}\n`);
     }
     socket.destroy();
   });
@@ -361,20 +361,20 @@ async function main() {
         socket.end("HTTP/1.1 401 Unauthorized\r\nconnection: close\r\n\r\n");
         return;
       }
-      const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "pocket.invalid"}`);
+      const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "dsh-remote.invalid"}`);
       if (url.pathname === "/gui" || url.pathname.startsWith("/gui/")) {
         request.url = stripGui(url.pathname) + url.search;
       }
       proxy.handleUpgrade(request, socket, head);
     } catch (error) {
-      process.stderr.write(`dsh-pocket: upgrade failed: ${error.message}\n`);
+      process.stderr.write(`dsh-remote: upgrade failed: ${error.message}\n`);
       socket.destroy();
     }
   });
 
   server.listen(port, host, () => {
     const local = `http://127.0.0.1:${port}/?k=${config.accessKey}`;
-    process.stdout.write(`dsh-pocket ${VERSION}\n`);
+    process.stdout.write(`dsh-remote ${VERSION}\n`);
     process.stdout.write(`  dsh web   ${dsh.baseUrl} (authenticated by gateway)\n`);
     process.stdout.write(`  local     ${local}\n`);
     for (const address of lanAddresses()) {
@@ -397,11 +397,11 @@ async function main() {
             return;
           }
           if (event.kind === "dropped" || event.kind === "error" || event.kind === "forward-refused") {
-            process.stderr.write(`dsh-pocket: tunnel ${event.kind}: ${event.detail}\n`);
+            process.stderr.write(`dsh-remote: tunnel ${event.kind}: ${event.detail}\n`);
             return;
           }
           if (event.kind === "log" && /Permission denied|Could not resolve|Connection refused/i.test(event.detail)) {
-            process.stderr.write(`dsh-pocket: ssh: ${event.detail}\n`);
+            process.stderr.write(`dsh-remote: ssh: ${event.detail}\n`);
           }
         },
       });
@@ -419,12 +419,12 @@ async function main() {
             onStatus: (event) => {
               if (event.kind === "dialing") process.stdout.write("  public    opening an outbound tunnel\n");
               else if (event.kind === "dropped" || event.kind === "error") {
-                process.stderr.write(`dsh-pocket: cloudflare ${event.kind}: ${event.detail}\n`);
+                process.stderr.write(`dsh-remote: cloudflare ${event.kind}: ${event.detail}\n`);
               }
             },
           });
         })
-        .catch((error) => process.stderr.write(`dsh-pocket: public tunnel unavailable: ${error.message}\n`));
+        .catch((error) => process.stderr.write(`dsh-remote: public tunnel unavailable: ${error.message}\n`));
     }
   });
 
@@ -439,6 +439,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  process.stderr.write(`dsh-pocket: ${error?.stack ?? error}\n`);
+  process.stderr.write(`dsh-remote: ${error?.stack ?? error}\n`);
   process.exitCode = 1;
 });

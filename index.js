@@ -1,5 +1,5 @@
 /**
- * dsh-pocket — the remote-access surface for this machine.
+ * dsh-remote — the remote-access surface for this machine.
  *
  * What it adds to a running dsh:
  *
@@ -25,7 +25,7 @@ import { injectMobileShell } from "./src/inject.mjs";
 import { startTunnel } from "./src/tunnel.mjs";
 import { ensureCloudflared, startQuickTunnel } from "./src/cloudflare.mjs";
 import { readAuthSecret, signSessionCookie } from "./src/dsh.mjs";
-import { authorize, mintPocketCookie, pocketCookieAttributes } from "./src/config.mjs";
+import { authorize, mintRemoteCookie, remoteCookieAttributes } from "./src/config.mjs";
 import { readStore, rotateAccessKey, writeStore } from "./src/store.mjs";
 import { ensureKeyLogin } from "./src/ssh-setup.mjs";
 import { renderConfigPage } from "./src/config-page.mjs";
@@ -33,7 +33,7 @@ import { renderUnlock } from "./src/ui.mjs";
 import { configPath } from "./src/config.mjs";
 
 /** Stable Cordis plugin name. */
-export const name = "dsh-pocket";
+export const name = "dsh-remote";
 
 /** The GUI's own carrier must exist before this plugin can proxy to it. */
 export const inject = ["webServer"];
@@ -96,7 +96,7 @@ function readFormBody(req) {
  * @param {import("@deepseek-ai/cordis").Context} ctx - the plugin context.
  */
 export function apply(ctx) {
-  const log = (message) => ctx.logger?.info?.(`dsh-pocket: ${message}`);
+  const log = (message) => ctx.logger?.info?.(`dsh-remote: ${message}`);
 
   /** @type {{stop: () => void} | undefined} */
   let tunnel;
@@ -211,13 +211,13 @@ export function apply(ctx) {
   // ── the mobile shell, mounted into dsh's own index ────────────────────────
   ctx.effect(
     () => ctx.webServer.tapIndex(injectMobileShell),
-    "dsh-pocket: mobile shell",
+    "dsh-remote: mobile shell",
   );
 
   // ── settings, reachable from the local GUI ────────────────────────────────
   ctx.effect(
-    () => ctx.webServer.register({ kind: "exact", path: "/pocket/config", handler: settingsPage }),
-    "dsh-pocket: settings route",
+    () => ctx.webServer.register({ kind: "exact", path: "/remote/config", handler: settingsPage }),
+    "dsh-remote: settings route",
   );
 
   // The same settings as JSON, for the in-GUI settings section. Both surfaces
@@ -252,19 +252,19 @@ export function apply(ctx) {
   }
 
   ctx.effect(
-    () => ctx.webServer.register({ kind: "exact", path: "/pocket/api/config", handler: apiConfig }),
-    "dsh-pocket: config api",
+    () => ctx.webServer.register({ kind: "exact", path: "/remote/api/config", handler: apiConfig }),
+    "dsh-remote: config api",
   );
   ctx.effect(
-    () => ctx.webServer.register({ kind: "exact", path: "/pocket/api/rotate", handler: apiRotate }),
-    "dsh-pocket: rotate api",
+    () => ctx.webServer.register({ kind: "exact", path: "/remote/api/rotate", handler: apiRotate }),
+    "dsh-remote: rotate api",
   );
 
   // ── the public listener ───────────────────────────────────────────────────
   const server = createServer(async (req, res) => {
     try {
       const store = readStore();
-      const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "pocket.invalid"}`);
+      const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "dsh-remote.invalid"}`);
       const path = url.pathname;
 
       const decision = authorize(req, store.accessKey);
@@ -275,14 +275,14 @@ export function apply(ctx) {
           html(res, 401, renderUnlock({ days: store.cookieDays, configPath: configPath() }));
           return;
         }
-        text(res, 401, "dsh-pocket: unauthorized. Open the URL printed by the plugin, or add ?k=<access-key>.\n");
+        text(res, 401, "dsh-remote: unauthorized. Open the URL printed by the plugin, or add ?k=<access-key>.\n");
         return;
       }
 
       if (decision.via === "key") {
         res.writeHead(303, {
           location: path + url.search.replace(/[?&]k=[^&]*/u, "").replace(/^&/u, "?"),
-          "set-cookie": `${mintPocketCookie(store.accessKey, store.cookieDays)}; ${pocketCookieAttributes(store.cookieDays)}`,
+          "set-cookie": `${mintRemoteCookie(store.accessKey, store.cookieDays)}; ${remoteCookieAttributes(store.cookieDays)}`,
           "cache-control": "no-store",
           "referrer-policy": "no-referrer",
         });
@@ -290,28 +290,28 @@ export function apply(ctx) {
         return;
       }
 
-      if (path === "/pocket/config") {
+      if (path === "/remote/config") {
         await settingsPage(req, res);
         return;
       }
-      if (path === "/pocket/api/config") {
+      if (path === "/remote/api/config") {
         await apiConfig(req, res);
         return;
       }
-      if (path === "/pocket/api/rotate") {
+      if (path === "/remote/api/rotate") {
         await apiRotate(req, res);
         return;
       }
-      if (path === "/pocket/rotate") {
+      if (path === "/remote/rotate") {
         if (req.method === "POST") {
           rotateAccessKey();
           restartTunnel();
         }
-        res.writeHead(303, { location: "/pocket/config", "cache-control": "no-store" });
+        res.writeHead(303, { location: "/remote/config", "cache-control": "no-store" });
         res.end();
         return;
       }
-      if (path === "/pocket/healthz") {
+      if (path === "/remote/healthz") {
         text(res, 200, JSON.stringify({ ok: true, plugin: name, gui: guiAuthority(), ...status }));
         return;
       }
@@ -323,7 +323,7 @@ export function apply(ctx) {
         res.destroy();
         return;
       }
-      text(res, 500, `dsh-pocket: ${error.message}\n`);
+      text(res, 500, `dsh-remote: ${error.message}\n`);
     }
   });
 
@@ -367,7 +367,7 @@ export function apply(ctx) {
     tunnel?.stop();
     publicTunnel?.stop();
     server.close();
-  }, "dsh-pocket: listener");
+  }, "dsh-remote: listener");
 
   // ── the outbound relay ────────────────────────────────────────────────────
   function restartTunnel() {
@@ -466,5 +466,5 @@ export function apply(ctx) {
     status.error = undefined;
   }
 
-  log("mounted; settings at /pocket/config");
+  log("mounted; settings at /remote/config");
 }

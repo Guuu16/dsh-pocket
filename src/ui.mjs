@@ -159,10 +159,10 @@ function page(options) {
 <meta name="theme-color" content="#0a0c10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="/pocket.webmanifest">
-<link rel="icon" href="/pocket.svg" type="image/svg+xml">
+<link rel="manifest" href="/remote.webmanifest">
+<link rel="icon" href="/remote.svg" type="image/svg+xml">
 <title>${escapeHtml(options.title)}</title>
-<link rel="stylesheet" href="/pocket.css">
+<link rel="stylesheet" href="/remote.css">
 </head>
 <body>
 <div class="shell">
@@ -173,7 +173,7 @@ ${options.actions ?? ""}
 </header>
 ${options.body}
 </div>
-<script src="/pocket.js" defer></script>
+<script src="/remote.js" defer></script>
 </body>
 </html>`;
 }

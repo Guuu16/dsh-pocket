@@ -1,8 +1,8 @@
 #!/bin/sh
-# Start the dsh-pocket gateway.
+# Start the dsh-remote gateway.
 #
 #   ./start.sh              run in the foreground (Ctrl-C stops it)
-#   ./start.sh --daemon     run in the background, logging to ~/.dsh-pocket/pocket.log
+#   ./start.sh --daemon     run in the background, logging to ~/.dsh-remote/remote.log
 #   ./start.sh --stop       stop a background instance
 #   ./start.sh --status     report whether it is running and print the paired URLs
 #
@@ -11,11 +11,11 @@
 set -eu
 
 DIR=$(cd "$(dirname "$0")" && pwd)
-HOME_DIR=${DSH_POCKET_HOME:-$HOME/.dsh-pocket}
-LOG="$HOME_DIR/pocket.log"
-PIDFILE="$HOME_DIR/pocket.pid"
+HOME_DIR=${DSH_REMOTE_HOME:-$HOME/.dsh-remote}
+LOG="$HOME_DIR/remote.log"
+PIDFILE="$HOME_DIR/remote.pid"
 NODE=${NODE:-node}
-MATCH="bin/dsh-pocket.mjs"
+MATCH="bin/dsh-remote.mjs"
 
 running() {
   [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
@@ -25,38 +25,38 @@ case "${1:-}" in
   --daemon)
     shift
     if running; then
-      echo "dsh-pocket already running (pid $(cat "$PIDFILE"))"
+      echo "dsh-remote already running (pid $(cat "$PIDFILE"))"
     else
       mkdir -p "$HOME_DIR"
       cd "$DIR"
       # shellcheck disable=SC2086 # extra flags are passed through deliberately
-      nohup "$NODE" bin/dsh-pocket.mjs "$@" > "$LOG" 2>&1 &
+      nohup "$NODE" bin/dsh-remote.mjs "$@" > "$LOG" 2>&1 &
       echo $! > "$PIDFILE"
       sleep 3
-      echo "dsh-pocket started (pid $(cat "$PIDFILE")), log: $LOG"
+      echo "dsh-remote started (pid $(cat "$PIDFILE")), log: $LOG"
     fi
     sed -n '1,20p' "$LOG"
     ;;
   --stop)
     if running; then
       kill "$(cat "$PIDFILE")" && rm -f "$PIDFILE"
-      echo "dsh-pocket stopped"
+      echo "dsh-remote stopped"
     else
-      pkill -f "$MATCH" 2>/dev/null && echo "dsh-pocket stopped" || echo "dsh-pocket not running"
+      pkill -f "$MATCH" 2>/dev/null && echo "dsh-remote stopped" || echo "dsh-remote not running"
       rm -f "$PIDFILE"
     fi
     ;;
   --status)
     if running || pgrep -f "$MATCH" >/dev/null 2>&1; then
-      echo "dsh-pocket is running"
-      "$NODE" "$DIR/bin/dsh-pocket.mjs" --print-access-url
+      echo "dsh-remote is running"
+      "$NODE" "$DIR/bin/dsh-remote.mjs" --print-access-url
     else
-      echo "dsh-pocket is not running"
+      echo "dsh-remote is not running"
       exit 1
     fi
     ;;
   *)
     cd "$DIR"
-    exec "$NODE" bin/dsh-pocket.mjs "$@"
+    exec "$NODE" bin/dsh-remote.mjs "$@"
     ;;
 esac

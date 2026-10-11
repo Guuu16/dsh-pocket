@@ -1,5 +1,5 @@
 /**
- * dsh-pocket's own settings, stored beside the dsh home.
+ * dsh-remote's own settings, stored beside the dsh home.
  *
  * Kept out of the Cordis row config on purpose: the user edits these from the
  * plugin's own page while the process is running, so they must be readable and
@@ -7,13 +7,35 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-/** Directory holding the plugin's durable state. */
+/**
+ * Directory holding the plugin's durable state.
+ *
+ * The plugin used to be called dsh-pocket and kept its state in
+ * `~/.dsh-pocket`. That directory is adopted once when the new one does not
+ * exist yet, so a rename never costs the user their configured relay.
+ */
 export function storeHome() {
-  return process.env.DSH_POCKET_HOME ?? join(homedir(), ".dsh-pocket");
+  if (typeof process.env.DSH_REMOTE_HOME === "string" && process.env.DSH_REMOTE_HOME !== "") {
+    return process.env.DSH_REMOTE_HOME;
+  }
+  const current = join(homedir(), ".dsh-remote");
+  const legacy = join(homedir(), ".dsh-pocket");
+  if (existsSync(current)) return current;
+  if (existsSync(legacy)) {
+    try {
+      renameSync(legacy, current);
+      return current;
+    } catch {
+      // A rename can fail across devices or on permissions; fall back to
+      // reading the legacy directory in place rather than starting empty.
+      return legacy;
+    }
+  }
+  return current;
 }
 
 /** Absolute path of the settings file. */

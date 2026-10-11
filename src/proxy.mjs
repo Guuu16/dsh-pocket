@@ -157,7 +157,7 @@ export function createProxy(options) {
         return;
       }
       res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-      res.end(`dsh-pocket: upstream ${authority} failed: ${error.message}\n`);
+      res.end(`dsh-remote: upstream ${authority} failed: ${error.message}\n`);
     });
 
     // A phone that backgrounds the page or roams networks closes the client

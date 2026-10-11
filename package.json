@@ -1,7 +1,6 @@
 {
-  "name": "dsh-pocket",
-  "version": "0.2.0",
-  "private": true,
+  "name": "dsh-remote",
+  "version": "1.0.0",
   "description": "Reach this machine's DeepSeek Harness from anywhere: a public entry point, a relay you configure inside dsh, and a mobile shell for the existing web GUI.",
   "type": "module",
   "exports": {
@@ -10,13 +9,13 @@
     "./locale/*.json": "./locale/*.json",
     "./client": "./client.js"
   },
-  "icon": "./public/pocket.svg",
+  "icon": "./public/remote.svg",
   "meta": {
-    "title": "dsh pocket",
-    "description": "从任何地方访问这台机器的 dsh：配置一台中继服务器即可获得公网入口。"
+    "title": "dsh remote",
+    "description": "从任何地方访问这台机器的 dsh：在设置里配置一台中继服务器，手机就能打开同一份工作区、同一份聊天记录。"
   },
   "bin": {
-    "dsh-pocket": "./bin/dsh-pocket.mjs"
+    "dsh-remote": "./bin/dsh-remote.mjs"
   },
   "dsh": {
     "bundle": {
@@ -30,5 +29,20 @@
   "engines": {
     "node": ">=22.15"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "remote-access",
+    "cloudflare-tunnel",
+    "ssh-tunnel",
+    "mobile",
+    "cordis-plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guuu16/dsh-remote.git"
+  },
+  "homepage": "https://github.com/Guuu16/dsh-remote#readme",
+  "license": "MIT"
 }

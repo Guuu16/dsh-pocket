@@ -19,7 +19,7 @@ import { execFileSync } from "node:child_process";
 
 /** Where a downloaded cloudflared is cached. */
 export function cloudflaredHome() {
-  return process.env.DSH_POCKET_CF_HOME ?? join(homedir(), ".dsh-pocket", "bin");
+  return process.env.DSH_REMOTE_CF_HOME ?? join(homedir(), ".dsh-remote", "bin");
 }
 
 const RELEASE_BASE = "https://github.com/cloudflare/cloudflared/releases/latest/download";
@@ -33,8 +33,8 @@ function assetFor(platform, arch) {
 
 /** Resolve an existing cloudflared, or undefined. */
 export function findCloudflared() {
-  if (typeof process.env.DSH_POCKET_CLOUDFLARED === "string" && process.env.DSH_POCKET_CLOUDFLARED !== "") {
-    return process.env.DSH_POCKET_CLOUDFLARED;
+  if (typeof process.env.DSH_REMOTE_CLOUDFLARED === "string" && process.env.DSH_REMOTE_CLOUDFLARED !== "") {
+    return process.env.DSH_REMOTE_CLOUDFLARED;
   }
   const cached = join(cloudflaredHome(), process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
   if (existsSync(cached)) return cached;

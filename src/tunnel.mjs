@@ -21,8 +21,8 @@ const RETRY_MS = 5000;
 
 function sshPath() {
   // Honour an explicit client (a Homebrew ssh, sshpass wrapper, or a test stub).
-  if (typeof process.env.DSH_POCKET_SSH === "string" && process.env.DSH_POCKET_SSH !== "") {
-    return process.env.DSH_POCKET_SSH;
+  if (typeof process.env.DSH_REMOTE_SSH === "string" && process.env.DSH_REMOTE_SSH !== "") {
+    return process.env.DSH_REMOTE_SSH;
   }
   for (const candidate of ["/usr/bin/ssh", "/usr/local/bin/ssh", "/opt/homebrew/bin/ssh"]) {
     try {

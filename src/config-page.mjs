@@ -95,7 +95,7 @@ export function renderConfigPage(input) {
   <div class="row" style="margin-top:8px"><span class="k">中继隧道</span><span class="pill ${status.tunnel === "up" ? "on" : "off"}">${esc(status.tunnel ?? "未启动")}</span></div>
   ${status.error === undefined ? "" : `<div class="note" style="color:var(--warn)">${esc(status.error)}</div>`}
   <div class="row" style="margin-top:10px"><span class="k">访问密钥</span><span class="v">${esc(key)}</span></div>
-  <form class="inline" method="post" action="/pocket/rotate" style="margin-top:10px">
+  <form class="inline" method="post" action="/remote/rotate" style="margin-top:10px">
     <button class="ghost" type="submit">换一把密钥（所有已配对设备失效）</button>
   </form>
 </div>
@@ -111,7 +111,7 @@ export function renderConfigPage(input) {
 </div>
 
 <h2>中继服务器</h2>
-<form method="post" action="/pocket/config">
+<form method="post" action="/remote/config">
 <div class="card">
   <label for="mode">方式</label>
   <select id="mode" name="mode">
@@ -153,7 +153,7 @@ export function renderConfigPage(input) {
 <div class="note">访问密钥是唯一的门禁。不装这个插件、没有这把密钥，任何人都进不来。</div>
 </div>
 
-<div id="dshp-error" class="note" style="display:none;color:var(--warn)"></div>
+<div id="dshr-error" class="note" style="display:none;color:var(--warn)"></div>
 
 </div>
 <script>
@@ -188,7 +188,7 @@ export function renderConfigPage(input) {
       }
     }).catch(function (error) {
       if (button) { button.disabled = false; button.textContent = label; }
-      var note = document.getElementById("dshp-error");
+      var note = document.getElementById("dshr-error");
       if (note) { note.textContent = "保存失败：" + error.message; note.style.display = "block"; }
     });
   });

@@ -1,4 +1,4 @@
-/* dsh-pocket client behaviour: list filtering plus a small transcript aid.
+/* dsh-remote client behaviour: list filtering plus a small transcript aid.
    Deliberately tiny — the pages are server-rendered and work without this file. */
 
 (function () {

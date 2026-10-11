@@ -98,14 +98,14 @@ export async function deployPublicKey(options) {
 set timeout 45
 spawn ssh-copy-id -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 ${sshPort === 22 ? "" : `-p ${Number(sshPort)} `}-i ${tclWord(key)} ${tclWord(target)}
 expect {
-  -re "(?i)password:" { send "$env(DSH_POCKET_SSH_PASSWORD)\\r"; exp_continue }
+  -re "(?i)password:" { send "$env(DSH_REMOTE_SSH_PASSWORD)\\r"; exp_continue }
   -re "(?i)yes/no" { send "yes\\r"; exp_continue }
   eof
 }
 `;
 
   const result = await run("/usr/bin/expect", ["-c", script], {
-    env: { ...process.env, DSH_POCKET_SSH_PASSWORD: password },
+    env: { ...process.env, DSH_REMOTE_SSH_PASSWORD: password },
   });
 
   if (result.code !== 0) {

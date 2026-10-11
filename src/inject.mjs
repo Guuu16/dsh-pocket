@@ -22,14 +22,14 @@ function asset(name) {
 }
 
 // Read once per process: these ship with the plugin and never change while it runs.
-const MOBILE_CSS = asset("pocket-mobile.css");
-const MOBILE_JS = asset("pocket-mobile.js");
+const MOBILE_CSS = asset("remote-mobile.css");
+const MOBILE_JS = asset("remote-mobile.js");
 
 const HEAD_SNIPPET =
   `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` +
-  (MOBILE_CSS === "" ? "" : `<style data-dsh-pocket="mobile">${MOBILE_CSS}</style>`);
+  (MOBILE_CSS === "" ? "" : `<style data-dsh-remote="mobile">${MOBILE_CSS}</style>`);
 
-const BODY_SNIPPET = MOBILE_JS === "" ? "" : `<script data-dsh-pocket="mobile">${MOBILE_JS}</script>`;
+const BODY_SNIPPET = MOBILE_JS === "" ? "" : `<script data-dsh-remote="mobile">${MOBILE_JS}</script>`;
 
 /**
  * Insert the mobile shell into one HTML document.
@@ -38,7 +38,7 @@ const BODY_SNIPPET = MOBILE_JS === "" ? "" : `<script data-dsh-pocket="mobile">$
  * @returns {string} the document with the shell mounted, or the input unchanged.
  */
 export function injectMobileShell(html) {
-  if (html.includes('data-dsh-pocket="mobile"')) return html;
+  if (html.includes('data-dsh-remote="mobile"')) return html;
 
   let out = html;
   if (out.includes("</head>")) {

@@ -1,4 +1,4 @@
-# dsh-pocket
+# dsh-remote
 
 把本机的 DeepSeek Harness 接到任何地方。
 
@@ -11,7 +11,7 @@
 **方式一：从 GitHub 装（推荐）**
 
 ```sh
-dsh plugin --profile desktop add github:Guuu16/dsh-pocket
+dsh plugin --profile desktop add github:Guuu16/dsh-remote
 ```
 
 装完重启一次 dsh。
@@ -19,13 +19,13 @@ dsh plugin --profile desktop add github:Guuu16/dsh-pocket
 **方式二：本地目录装**
 
 ```sh
-git clone https://github.com/Guuu16/dsh-pocket.git ~/dsh-pocket
-dsh plugin --profile desktop add ~/dsh-pocket
+git clone https://github.com/Guuu16/dsh-remote.git ~/dsh-remote
+dsh plugin --profile desktop add ~/dsh-remote
 ```
 
 也可以在 dsh 的插件页面里，用「安装 bundle」指向这个目录。
 
-**要求**：Node ≥ 22.15（用到内置的 zstd 解压）。云隧道模式首次会自动下载 `cloudflared` 到 `~/.dsh-pocket/bin/`，不需要 brew，也不需要账号。
+**要求**：Node ≥ 22.15（用到内置的 zstd 解压）。云隧道模式首次会自动下载 `cloudflared` 到 `~/.dsh-remote/bin/`，不需要 brew，也不需要账号。
 
 ---
 
@@ -92,7 +92,7 @@ https://xxx.trycloudflare.com/?k=<access-key>
 
 ```sh
 ./start.sh              # 前台，打印配对链接
-./start.sh --daemon     # 后台，日志在 ~/.dsh-pocket/pocket.log
+./start.sh --daemon     # 后台，日志在 ~/.dsh-remote/remote.log
 ./start.sh --status     # 看状态 + 重新打印链接
 ./start.sh --stop
 ```
@@ -118,9 +118,9 @@ src/ssh-setup.mjs        首次用密码部署公钥
 src/zstd-frames.mjs      zstd 帧结构扫描与逐帧解压
 src/session-store.mjs    独立模式的全量项目/会话索引
 src/ui.mjs               独立模式的页面渲染
-src/config-page.mjs      /pocket/config 那个页面
-public/pocket-mobile.*   手机外壳的样式和脚本
-bin/dsh-pocket.mjs       独立网关入口
+src/config-page.mjs      /remote/config 那个页面
+public/remote-mobile.*   手机外壳的样式和脚本
+bin/dsh-remote.mjs       独立网关入口
 ```
 
 零运行时依赖，只用 Node 内置模块。
