@@ -1,0 +1,14 @@
+# Submission for awesome-dsh-plugin/awesome-dsh-plugin
+#
+# The whole submission is one file at data/plugins/<owner>__<repo>.yml.
+# The two READMEs are generated from those files and must not be hand-edited.
+# A description containing ": " must be quoted or YAML reads it as a nested key.
+#
+# Blocked until the repository is one day old (hard requirement).
+
+url: https://github.com/Guuu16/dsh-remote
+name: Guuu16/dsh-remote
+category: remote
+description:
+  en: 'Reach this machine from a phone: a LAN listener proxies the existing web GUI behind an access key, the relay is configured inside dsh (SSH reverse tunnel or a zero-config Cloudflare tunnel), every address has a QR code beside it, and PWA metadata makes add-to-home-screen a full-screen app. Also registers directories that have session history but no workspace entry — the reason a project can be missing from the sidebar while its transcripts exist.'
+  zh: '用手机访问本机的 dsh：局域网 listener 在访问密钥后面代理 dsh 自己的 Web GUI，中继在设置里配置（SSH 反向隧道或零配置 Cloudflare），每个地址旁边都有二维码，并注入 PWA 元数据使「添加到主屏幕」成为全屏 app。还会注册「有会话历史但没有工作区条目」的目录——这正是项目在侧边栏里消失、历史却还在的原因。'
