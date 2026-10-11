@@ -62,6 +62,9 @@ window.__ModuleLoader__.load({
 .dshr-qrbox { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
 .dshr-qr { width: 124px; height: 124px; flex: none; border-radius: 10px; background: #ffffff; padding: 6px; }
 .dshr-plist { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.dshr-toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;
+  color: var(--dsw-alias-label-secondary, #8b95a7); }
+.dshr-toggle input { width: 15px; height: 15px; accent-color: #3f63f5; cursor: pointer; }
 .dshr-pline { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
 .dshr-ptitle { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
   color: var(--dsw-alias-label-primary, #e7ebf3); min-width: 110px; }
@@ -231,6 +234,33 @@ window.__ModuleLoader__.load({
         }
       }, [adopt, flashNote]);
 
+      /**
+       * Turn the startup sync on or off.
+       *
+       * Sent through the config endpoint with the rest of the draft, and the
+       * host only writes the flag when it is actually a boolean — so a plain
+       * save from the form below never clobbers this choice.
+       */
+      const setAutoSync = useCallback(async (next) => {
+        setBusy(true);
+        setActionError("");
+        try {
+          const res = await fetch("/remote/api/config", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(Object.assign({}, draft, { autoSyncProjects: next })),
+          });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          adopt(await res.json(), false);
+          flashNote(next ? "以后启动时会自动补齐新项目。" : "已关闭自动补齐。");
+        } catch (e) {
+          setActionError("保存失败：" + e.message);
+        } finally {
+          setBusy(false);
+        }
+      }, [draft, adopt, flashNote]);
+
       if (draft === null || state === null) {
         return h("div", { className: "dshp" }, h("style", null, CSS), h("p", null, error === "" ? "加载中…" : error));
       }
@@ -286,6 +316,15 @@ window.__ModuleLoader__.load({
             orphans.length === 0 ? null : h("p", { className: "dshr-err" },
               `${orphans.length} 个工作区的目录已经不在了：${orphans.map((o) => o.title).join("、")}`),
             h("div", { className: "dshr-plist" }, rows),
+            h("label", { className: "dshr-toggle" },
+              h("input", {
+                type: "checkbox",
+                checked: state.autoSyncProjects === true,
+                disabled: busy,
+                onChange: (e) => setAutoSync(e.target.checked),
+              }),
+              h("span", null, "启动时自动补齐新项目")
+            ),
             missing.length === 0 ? null : h("div", { className: "dshr-actions" },
               h("button", { type: "button", className: "primary", onClick: sync, disabled: busy },
                 busy ? "处理中…" : `补齐这 ${missing.length} 个项目（${pending} 个会话）`),

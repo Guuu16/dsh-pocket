@@ -51,6 +51,9 @@ function defaults() {
     port: 8787,
     accessKey: randomBytes(32).toString("base64url"),
     cookieDays: 30,
+    // Off by default: this writes the durable workspace registry, which is the
+    // user's own state, so it must be opted into rather than assumed.
+    autoSyncProjects: false,
     relay: {
       mode: "off",
       host: "",

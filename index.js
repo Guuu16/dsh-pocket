@@ -334,6 +334,7 @@ export function apply(ctx) {
       status: { ...status },
       lanUrls: lanUrls(),
       lanInterfaces: lanInterfaces(),
+      autoSyncProjects: readStore().autoSyncProjects === true,
     };
   }
 
@@ -360,7 +361,9 @@ export function apply(ctx) {
     };
     const password = text(input.password);
     if (password !== "") relay.password = password;
-    writeStore({ relay });
+    const patch = { relay };
+    if (typeof input.autoSyncProjects === "boolean") patch.autoSyncProjects = input.autoSyncProjects;
+    writeStore(patch);
     restartTunnel();
     return snapshot();
   }
@@ -624,6 +627,20 @@ export function apply(ctx) {
       log(`  phone: http://${iface.address}:${store0.port}/?k=${readStore().accessKey} (${iface.name})`);
     }
     restartTunnel();
+
+    // Opt-in upkeep: a project added since the last run shows up without the
+    // user remembering to press the button. A failure here is logged and
+    // dropped — the page reports the same gap on its own.
+    if (readStore().autoSyncProjects === true) {
+      const timer = setTimeout(() => {
+        syncProjects()
+          .then((result) => {
+            if (result.added.length > 0) log(`auto-synced projects: ${result.added.join(", ")}`);
+          })
+          .catch((error) => log(`auto-sync failed: ${error.message}`));
+      }, 5000);
+      timer.unref?.();
+    }
   });
   server.on("error", (error) => {
     status.gateway = "failed";
