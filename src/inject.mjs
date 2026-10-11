@@ -25,7 +25,26 @@ function asset(name) {
 const MOBILE_CSS = asset("remote-mobile.css");
 const MOBILE_JS = asset("remote-mobile.js");
 
+/**
+ * Metadata that turns the proxied GUI into an installable app.
+ *
+ * `black-translucent` is the only status-bar style that lets the page paint
+ * under the status bar, which is what the safe-area padding in the mobile
+ * stylesheet is for — the other styles reserve space and the padding then
+ * doubles up.
+ */
+const PWA_SNIPPET =
+  `<link rel="manifest" href="/remote.webmanifest">` +
+  `<meta name="theme-color" content="#0a0c10">` +
+  `<meta name="mobile-web-app-capable" content="yes">` +
+  `<meta name="apple-mobile-web-app-capable" content="yes">` +
+  `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">` +
+  `<meta name="apple-mobile-web-app-title" content="dsh">` +
+  `<link rel="apple-touch-icon" sizes="180x180" href="/remote-icon-180.png">` +
+  `<link rel="icon" type="image/png" sizes="192x192" href="/remote-icon-192.png">`;
+
 const HEAD_SNIPPET =
+  PWA_SNIPPET +
   `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` +
   (MOBILE_CSS === "" ? "" : `<style data-dsh-remote="mobile">${MOBILE_CSS}</style>`);
 

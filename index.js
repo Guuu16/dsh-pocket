@@ -19,7 +19,8 @@
 
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
+import { readFileSync } from "node:fs";
 
 import { createProxy } from "./src/proxy.mjs";
 import { injectMobileShell } from "./src/inject.mjs";
@@ -68,6 +69,53 @@ function html(res, status, body) {
 
 function text(res, status, body) {
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+  res.end(body);
+}
+
+/**
+ * Static files shipped with the plugin, served by the host.
+ *
+ * This half runs inside dsh, whose own web server knows nothing about these
+ * paths — without explicit routes the manifest and the icons answer 404 and
+ * the installed app has no name and no icon on the home screen.
+ */
+const ASSETS = new Map([
+  ["/remote.webmanifest", "remote.webmanifest"],
+  ["/remote.svg", "remote.svg"],
+  ["/remote-icon-180.png", "remote-icon-180.png"],
+  ["/remote-icon-192.png", "remote-icon-192.png"],
+  ["/remote-icon-512.png", "remote-icon-512.png"],
+]);
+
+const ASSET_TYPES = new Map([
+  [".webmanifest", "application/manifest+json; charset=utf-8"],
+  [".svg", "image/svg+xml; charset=utf-8"],
+  [".png", "image/png"],
+]);
+
+/** Read once per process: these ship with the plugin and never change while it runs. */
+const ASSET_CACHE = new Map();
+
+function serveAsset(res, file) {
+  let body = ASSET_CACHE.get(file);
+  if (body === undefined) {
+    try {
+      body = readFileSync(new URL(`./public/${file}`, import.meta.url));
+    } catch {
+      body = null;
+    }
+    ASSET_CACHE.set(file, body);
+  }
+  if (body === null) {
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+    res.end("dsh-remote: asset missing\n");
+    return;
+  }
+  res.writeHead(200, {
+    "content-type": ASSET_TYPES.get(extname(file)) ?? "application/octet-stream",
+    "cache-control": "no-cache",
+    "content-length": String(body.byteLength),
+  });
   res.end(body);
 }
 
@@ -395,6 +443,19 @@ export function apply(ctx) {
     "dsh-remote: qr api",
   );
 
+  // The manifest and icons the PWA metadata points at. Without these routes the
+  // browser gets dsh's GUI index for every one of them.
+  for (const route of ASSETS.keys()) {
+    ctx.effect(
+      () => ctx.webServer.register({
+        kind: "exact",
+        path: route,
+        handler: (req, res) => serveAsset(res, ASSETS.get(route)),
+      }),
+      `dsh-remote: asset ${route}`,
+    );
+  }
+
   // ── the public listener ───────────────────────────────────────────────────
   const server = createServer(async (req, res) => {
     try {
@@ -443,6 +504,10 @@ export function apply(ctx) {
       }
       if (path === "/remote/api/qr") {
         await apiQr(req, res);
+        return;
+      }
+      if (ASSETS.has(path)) {
+        serveAsset(res, ASSETS.get(path));
         return;
       }
       if (path === "/remote/rotate") {
