@@ -317,13 +317,19 @@ window.__ModuleLoader__.load({
 
         h("div", { className: "dshr-card" },
           h("h3", null, "局域网地址"),
-          (state.lanUrls ?? []).length === 0
-            ? h("p", null, "没有检测到局域网地址。")
-            : (state.lanUrls ?? []).map((url, i) => h("div", { key: i },
-                h("code", { className: "dshr-url" }, url + "/?k=" + key),
-                i === 0 ? h(Qr, { url: url + "/?k=" + key }) : null,
-              )),
-          h("p", { className: "dshr-note" }, "手机和这台机器同一个 WiFi 时直接用这个，最快。")
+          (function lanList() {
+            // Prefer the adapter-named list; fall back to bare URLs if an older
+            // host half answers. Every adapter gets its own code, because on a
+            // machine with a VPN the first address is often not the reachable one.
+            const entries = state.lanInterfaces ?? (state.lanUrls ?? []).map((url) => ({ url }));
+            if (entries.length === 0) return h("p", null, "没有检测到局域网地址。");
+            return entries.map((entry, i) => h("div", { key: entry.url + i },
+              h("code", { className: "dshr-url" }, entry.url + "/?k=" + key),
+              entry.name === undefined ? null : h("p", { className: "dshr-note" }, `网卡 ${entry.name}`),
+              h(Qr, { url: entry.url + "/?k=" + key })
+            ));
+          })(),
+          h("p", { className: "dshr-note" }, "手机和这台机器同一个 WiFi 时直接用这个，最快。地址由路由器分配，换网络后会变，重新打开这一页拿新的。")
         ),
 
         h("div", { className: "dshr-card" },

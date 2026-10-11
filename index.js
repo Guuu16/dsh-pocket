@@ -46,16 +46,35 @@ export const name = "dsh-remote";
  */
 export const inject = ["webServer", "sessionQuery", "workspaceRegistry"];
 
+/**
+ * Interface name prefixes that never reach a phone on the same network.
+ *
+ * A VPN tunnel or a container bridge has an IPv4 address too, and it is
+ * usually enumerated before the Wi-Fi one — which is how a QR code ends up
+ * encoding an address that only exists inside this machine.
+ */
+const VIRTUAL_INTERFACE = /^(utun|ipsec|bridge|awdl|llw|vmenet|docker|veth|tap|tun|gif|stf|ap\d|p2p|anpi)/iu;
+
+/** Rank a real interface ahead of an unknown one: en0 is Wi-Fi or Ethernet. */
+function interfaceRank(name) {
+  if (/^en\d+$/u.test(name)) return 0;
+  if (/^(eth|wlan)\d+$/u.test(name)) return 1;
+  return 2;
+}
+
 function lanAddresses() {
   const out = [];
-  for (const ifaces of Object.values(networkInterfaces())) {
+  for (const [name, ifaces] of Object.entries(networkInterfaces())) {
+    if (VIRTUAL_INTERFACE.test(name)) continue;
     for (const iface of ifaces ?? []) {
       if (iface.family !== "IPv4" || iface.internal) continue;
       if (iface.address.startsWith("169.254.")) continue;
       if (iface.address.startsWith("198.18.") || iface.address.startsWith("198.19.")) continue;
-      out.push(iface.address);
+      out.push({ name, address: iface.address });
     }
   }
+  // Real adapters first, so a phone gets the address it can actually reach.
+  out.sort((a, b) => interfaceRank(a.name) - interfaceRank(b.name) || a.name.localeCompare(b.name));
   return out;
 }
 
@@ -211,7 +230,7 @@ export function apply(ctx) {
 
   function lanUrls() {
     const store = readStore();
-    return lanAddresses().map((address) => `http://${address}:${store.port}`);
+    return lanAddresses().map((iface) => `http://${iface.address}:${store.port}`);
   }
 
   /**
@@ -293,6 +312,18 @@ export function apply(ctx) {
     return { added, failed };
   }
 
+  /**
+   * The LAN addresses paired with the adapter they came from.
+   *
+   * A machine with a VPN or a container runtime has several IPv4 addresses and
+   * only one of them is reachable from a phone, so the name is what lets the
+   * user tell which code to scan.
+   */
+  function lanInterfaces() {
+    const store = readStore();
+    return lanAddresses().map((iface) => ({ name: iface.name, url: `http://${iface.address}:${store.port}` }));
+  }
+
   /** The shape the settings page and the in-GUI settings section both read. */
   function snapshot() {
     const store = readStore();
@@ -302,6 +333,7 @@ export function apply(ctx) {
       relay: { ...store.relay, password: store.relay.password === "" ? "" : "***" },
       status: { ...status },
       lanUrls: lanUrls(),
+      lanInterfaces: lanInterfaces(),
     };
   }
 
@@ -588,8 +620,8 @@ export function apply(ctx) {
     status.gateway = "listening";
     status.error = undefined;
     log(`listening on ${store0.host}:${store0.port} → ${guiAuthority()}`);
-    for (const address of lanAddresses()) {
-      log(`  phone: http://${address}:${store0.port}/?k=${readStore().accessKey}`);
+    for (const iface of lanAddresses()) {
+      log(`  phone: http://${iface.address}:${store0.port}/?k=${readStore().accessKey} (${iface.name})`);
     }
     restartTunnel();
   });
