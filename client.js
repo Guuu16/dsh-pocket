@@ -61,7 +61,11 @@ window.__ModuleLoader__.load({
 .dshr-bad { color: #ff7a7a; }
 .dshr-wait { color: #d9a441; }
 .dshr-ok-card { border-color: #3fb27f !important; }
-.dshr-url { display: block; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; word-break: break-all; min-width: 0; max-width: 100%;
+/* In the phone's 67px content lane a long URL broke into five-character
+   fragments. Smaller type plus break-anywhere keeps it readable, and the QR
+   above it is the primary way in anyway. */
+.dshr-url { display: block; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.45;
+  word-break: break-all; overflow-wrap: anywhere; min-width: 0; max-width: 100%;
   font-family: ui-monospace, Menlo, monospace; background: var(--dsw-alias-bg-layer-2, #1b2130);
   border: 1px solid var(--dsw-alias-border-l1, #252b36); color: var(--dsw-alias-label-primary, #e7ebf3); }
 .dshr-qrbox { display: flex; align-items: center; gap: 14px; margin-top: 4px; flex-wrap: wrap; min-width: 0; }
