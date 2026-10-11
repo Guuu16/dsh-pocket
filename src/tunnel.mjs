@@ -69,11 +69,22 @@ export function startTunnel(options) {
   let child;
   let stopped = false;
   let timer;
+  let settle;
 
   const launch = () => {
     if (stopped) return;
     child = spawn(sshPath(), args, { stdio: ["ignore", "ignore", "pipe"] });
     options.onStatus?.({ kind: "dialing", detail: `${target} → :${remotePort}` });
+
+    // `ExitOnForwardFailure=yes` makes ssh exit immediately when the forward is
+    // refused, so a session that is still alive after a moment has the port.
+    // Without this, callers could only report "up" optimistically — a tunnel
+    // that never came up would look identical to one that did.
+    settle = setTimeout(() => {
+      if (stopped || child === undefined) return;
+      options.onStatus?.({ kind: "established", detail: `${remotePort} → 127.0.0.1:${localPort}` });
+    }, 2500);
+    settle.unref?.();
 
     let stderr = "";
     child.stderr?.setEncoding("utf8");
@@ -88,10 +99,12 @@ export function startTunnel(options) {
     });
 
     child.on("error", (error) => {
+      clearTimeout(settle);
       options.onStatus?.({ kind: "error", detail: error.message });
     });
 
     child.on("exit", (code, signal) => {
+      clearTimeout(settle);
       child = undefined;
       if (stopped) return;
       options.onStatus?.({

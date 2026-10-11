@@ -25,11 +25,37 @@ function run(command, args, options = {}) {
     const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
+    let settled = false;
+    // expect has its own 45s timeout, but it can still wedge (no tty, a prompt
+    // that never matches). Bound the whole call so the settings request returns.
+    const guard = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      resolve({ code: -1, out, err: (err || out) + "\n[timed out after 90s]" });
+    }, 90_000);
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(guard);
+      resolve(value);
+    };
     child.stdout?.on("data", (chunk) => (out += chunk));
     child.stderr?.on("data", (chunk) => (err += chunk));
-    child.on("error", (error) => resolve({ code: -1, out, err: error.message }));
-    child.on("close", (code) => resolve({ code, out, err }));
+    child.on("error", (error) => done({ code: -1, out, err: error.message }));
+    child.on("close", (code) => done({ code, out, err }));
   });
+}
+
+/**
+ * Wrap a value for Tcl in `spawn`.
+ *
+ * The relay host, user and key path come from user input and land inside an
+ * expect script; a `"` or `[` there would change what expect executes.
+ * Braces make Tcl treat the whole thing as one literal word.
+ */
+function tclWord(value) {
+  return `{${String(value).replaceAll("\\", "\\\\").replaceAll("{", "\\{").replaceAll("}", "\\}")}}`;
 }
 
 function sshArgs(target, sshPort) {
@@ -70,7 +96,7 @@ export async function deployPublicKey(options) {
 
   const script = `
 set timeout 45
-spawn ssh-copy-id -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 ${sshPort === 22 ? "" : `-p ${sshPort} `}-i ${key} ${target}
+spawn ssh-copy-id -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 ${sshPort === 22 ? "" : `-p ${Number(sshPort)} `}-i ${tclWord(key)} ${tclWord(target)}
 expect {
   -re "(?i)password:" { send "$env(DSH_POCKET_SSH_PASSWORD)\\r"; exp_continue }
   -re "(?i)yes/no" { send "yes\\r"; exp_continue }

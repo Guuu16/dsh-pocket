@@ -43,7 +43,12 @@ export function loadConfig() {
     stored = {};
   }
 
+  // Spread `stored` first: this file shares `config.json` with the plugin's own
+  // store, which owns `relay` and other fields. Rebuilding the object from a
+  // fixed key list silently deleted them every time the standalone gateway
+  // started or rotated a key.
   const config = {
+    ...stored,
     port: Number(stored.port ?? 8787),
     host: stored.host ?? "0.0.0.0",
     accessKey: typeof stored.accessKey === "string" && stored.accessKey.length >= 16

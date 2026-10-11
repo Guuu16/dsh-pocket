@@ -84,8 +84,11 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(null);
       const [busy, setBusy] = useState(false);
       const [note, setNote] = useState("");
-      const [error, setError] = useState("");
+      const [loadError, setLoadError] = useState("");
+      const [actionError, setActionError] = useState("");
       const timer = useRef(undefined);
+      const noteTimer = useRef(undefined);
+      const error = actionError === "" ? loadError : actionError;
 
       /**
        * Take a server snapshot.
@@ -114,20 +117,31 @@ window.__ModuleLoader__.load({
           const res = await fetch("/pocket/api/config", { credentials: "same-origin" });
           if (!res.ok) throw new Error("HTTP " + res.status);
           adopt(await res.json(), syncDraft);
+          setLoadError("");
         } catch (e) {
-          setError("读取配置失败：" + e.message);
+          setLoadError("读取配置失败：" + e.message);
         }
       }, [adopt]);
 
       useEffect(() => {
         load(true);
         timer.current = setInterval(() => load(false), 4000);
-        return () => clearInterval(timer.current);
+        return () => {
+          clearInterval(timer.current);
+          clearTimeout(noteTimer.current);
+        };
       }, [load]);
+
+      /** Show a temporary confirmation instead of one that never expires. */
+      const flashNote = useCallback((message) => {
+        setNote(message);
+        clearTimeout(noteTimer.current);
+        noteTimer.current = setTimeout(() => setNote(""), 6000);
+      }, []);
 
       const save = useCallback(async () => {
         setBusy(true);
-        setError("");
+        setActionError("");
         setNote("");
         try {
           const res = await fetch("/pocket/api/config", {
@@ -141,7 +155,7 @@ window.__ModuleLoader__.load({
           // No fixed message here: the status strip below is derived from the
           // live tunnel state, so it reports progress and success by itself.
         } catch (e) {
-          setError("保存失败：" + e.message);
+          setActionError("保存失败：" + e.message);
         } finally {
           setBusy(false);
         }
@@ -149,18 +163,18 @@ window.__ModuleLoader__.load({
 
       const rotate = useCallback(async () => {
         setBusy(true);
-        setError("");
+        setActionError("");
         try {
           const res = await fetch("/pocket/api/rotate", { method: "POST", credentials: "same-origin" });
           if (!res.ok) throw new Error("HTTP " + res.status);
           adopt(await res.json(), false);
-          setNote("已换新密钥，之前配对的设备全部失效。");
+          flashNote("已换新密钥，之前配对的设备全部失效。");
         } catch (e) {
-          setError("换密钥失败：" + e.message);
+          setActionError("换密钥失败：" + e.message);
         } finally {
           setBusy(false);
         }
-      }, [adopt]);
+      }, [adopt, flashNote]);
 
       if (draft === null || state === null) {
         return h("div", { className: "dshp" }, h("style", null, CSS), h("p", null, error === "" ? "加载中…" : error));
@@ -208,9 +222,9 @@ window.__ModuleLoader__.load({
 
         h("div", { className: "dshp-card" },
           h("h3", null, "局域网地址"),
-          state.lanUrls.length === 0
+          (state.lanUrls ?? []).length === 0
             ? h("p", null, "没有检测到局域网地址。")
-            : state.lanUrls.map((url, i) => h("code", { className: "dshp-url", key: i }, url + "/?k=" + key)),
+            : (state.lanUrls ?? []).map((url, i) => h("code", { className: "dshp-url", key: i }, url + "/?k=" + key)),
           h("p", { className: "dshp-note" }, "手机和这台机器同一个 WiFi 时直接用这个，最快。")
         ),
 

@@ -56,6 +56,15 @@ export function readStore() {
   };
   if (typeof merged.accessKey !== "string" || merged.accessKey.length < 16) {
     merged.accessKey = base.accessKey;
+    // Persist it now. `defaults()` mints a fresh key on every call, so a store
+    // read without a key would hand each request a different secret and no
+    // device could ever pair.
+    try {
+      mkdirSync(storeHome(), { recursive: true, mode: 0o700 });
+      writeFileSync(storePath(), JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
+    } catch {
+      // Read-only home: keep the in-memory key and let authorization fail loudly.
+    }
   }
   return merged;
 }

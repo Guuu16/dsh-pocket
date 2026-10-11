@@ -29,6 +29,8 @@ import { authorize, mintPocketCookie, pocketCookieAttributes } from "./src/confi
 import { readStore, rotateAccessKey, writeStore } from "./src/store.mjs";
 import { ensureKeyLogin } from "./src/ssh-setup.mjs";
 import { renderConfigPage } from "./src/config-page.mjs";
+import { renderUnlock } from "./src/ui.mjs";
+import { configPath } from "./src/config.mjs";
 
 /** Stable Cordis plugin name. */
 export const name = "dsh-pocket";
@@ -66,16 +68,25 @@ function readFormBody(req) {
   return new Promise((resolve) => {
     const chunks = [];
     let bytes = 0;
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     req.on("data", (chunk) => {
       bytes += chunk.length;
       if (bytes > 64 * 1024) {
+        // Settle before destroying: the handler must not stay pending forever.
+        done("");
         req.destroy();
         return;
       }
       chunks.push(chunk);
     });
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-    req.on("error", () => resolve(""));
+    req.on("end", () => done(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", () => done(""));
+    req.on("close", () => done(""));
   });
 }
 
@@ -259,7 +270,9 @@ export function apply(ctx) {
       const decision = authorize(req, store.accessKey);
       if (decision.ok === false) {
         if (path === "/" || path === "/index.html") {
-          html(res, 401, renderConfigPage({ store, status: { ...status, lanUrls: lanUrls() } }));
+          // Never render the settings page here: it embeds the access key, which
+          // would hand the key to the very requests it is meant to reject.
+          html(res, 401, renderUnlock({ days: store.cookieDays, configPath: configPath() }));
           return;
         }
         text(res, 401, "dsh-pocket: unauthorized. Open the URL printed by the plugin, or add ?k=<access-key>.\n");
@@ -376,14 +389,19 @@ export function apply(ctx) {
             localPort: readStore().port,
             binary,
             onUrl: (url) => {
+              if (generation !== tunnelGeneration) return;
               status.tunnel = "up";
               status.error = undefined;
               status.publicUrl = url;
               log(`public: ${url}/?k=${readStore().accessKey}`);
             },
             onStatus: (event) => {
+              if (generation !== tunnelGeneration) return;
               if (event.kind === "dialing") status.tunnel = "拨号中";
-              if (event.kind === "dropped" || event.kind === "error") status.tunnel = "断开，重试中";
+              if (event.kind === "dropped" || event.kind === "error") {
+                status.tunnel = "断开，重试中";
+                status.publicUrl = undefined;
+              }
             },
           });
         })
@@ -414,18 +432,28 @@ export function apply(ctx) {
             remotePort: relay.remotePort,
             localPort: readStore().port,
             onStatus: (event) => {
+              // Ignore callbacks from a tunnel this generation already replaced.
+              if (generation !== tunnelGeneration) return;
               if (event.kind === "dialing") status.tunnel = "拨号中";
-              if (event.kind === "dropped") status.tunnel = "断开，重试中";
+              if (event.kind === "established") {
+                status.tunnel = "up";
+                status.error = undefined;
+                status.publicUrl = `http://${relay.host}:${relay.remotePort}`;
+                log(`anywhere: ${status.publicUrl}/?k=${readStore().accessKey}`);
+              }
+              if (event.kind === "dropped") {
+                // The forward is gone, so the published address is no longer
+                // true — do not keep showing a URL that no longer answers.
+                status.tunnel = "断开，重试中";
+                status.publicUrl = undefined;
+              }
               if (event.kind === "forward-refused") {
                 status.tunnel = "端口被拒";
+                status.publicUrl = undefined;
                 status.error = `服务器拒绝转发 ${relay.remotePort}：（需要 GatewayPorts clientspecified，且安全组要放行该端口）`;
               }
             },
           });
-          status.tunnel = "up";
-          status.error = undefined;
-          status.publicUrl = `http://${relay.host}:${relay.remotePort}`;
-          log(`anywhere: ${status.publicUrl}/?k=${readStore().accessKey}`);
         })
         .catch((error) => {
           status.tunnel = "失败";
@@ -435,6 +463,7 @@ export function apply(ctx) {
     }
 
     status.tunnel = "关闭";
+    status.error = undefined;
   }
 
   log("mounted; settings at /pocket/config");
