@@ -19,6 +19,7 @@
 
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
+import { basename } from "node:path";
 
 import { createProxy } from "./src/proxy.mjs";
 import { injectMobileShell } from "./src/inject.mjs";
@@ -35,8 +36,13 @@ import { configPath } from "./src/config.mjs";
 /** Stable Cordis plugin name. */
 export const name = "dsh-remote";
 
-/** The GUI's own carrier must exist before this plugin can proxy to it. */
-export const inject = ["webServer"];
+/**
+ * The GUI's own carrier must exist before this plugin can proxy to it, and the
+ * two query services drive project discovery: every session records its `cwd`,
+ * and a workspace owns every session whose canonical directory matches. Listing
+ * both is what closes the gap between what the GUI shows and what has history.
+ */
+export const inject = ["webServer", "sessionQuery", "workspaceRegistry"];
 
 function lanAddresses() {
   const out = [];
@@ -159,6 +165,57 @@ export function apply(ctx) {
     return lanAddresses().map((address) => `http://${address}:${store.port}`);
   }
 
+  /**
+   * Directories that have session history but no workspace entry.
+   *
+   * The GUI sidebar lists workspaces, not directories with history, so a
+   * project the registry never learned about is invisible on the phone even
+   * though its transcripts are there. Both sides come from the same source:
+   * every session header carries its `cwd`.
+   */
+  async function discoverProjects() {
+    const records = await ctx.sessionQuery.listSessions();
+    const counts = new Map();
+    for (const record of records) {
+      const cwd = record.header?.cwd;
+      if (typeof cwd !== "string" || cwd === "") continue;
+      counts.set(cwd, (counts.get(cwd) ?? 0) + 1);
+    }
+    const owned = new Set();
+    for (const workspace of ctx.workspaceRegistry.list()) owned.add(workspace.path);
+    const missing = [];
+    for (const [cwd, sessions] of counts) {
+      if (owned.has(cwd)) continue;
+      missing.push({ path: cwd, title: basename(cwd), sessions });
+    }
+    missing.sort((a, b) => b.sessions - a.sessions);
+    return { total: counts.size, missing };
+  }
+
+  /**
+   * Register every discovered directory as a workspace.
+   *
+   * `workspaceRegistry.create` canonicalizes through `fs.realpath` and is
+   * idempotent, so a path that already has a workspace is a no-op and a path
+   * whose directory is gone rejects on its own. Sessions attach automatically:
+   * `Workspace.sessionIds` is filtered by the canonical-cwd index, so the
+   * transcripts appear without an explicit attach call.
+   */
+  async function syncProjects() {
+    const { missing } = await discoverProjects();
+    const added = [];
+    const failed = [];
+    for (const item of missing) {
+      try {
+        await ctx.workspaceRegistry.create(item.path, item.title);
+        added.push(item.title);
+      } catch (error) {
+        failed.push(`${item.title}: ${error.message}`);
+      }
+    }
+    return { added, failed };
+  }
+
   /** The shape the settings page and the in-GUI settings section both read. */
   function snapshot() {
     const store = readStore();
@@ -222,9 +279,19 @@ export function apply(ctx) {
 
   // The same settings as JSON, for the in-GUI settings section. Both surfaces
   // go through `applySettings`, so a change made in either one is identical.
+  /** Attach project discovery without letting a failure break the whole reply. */
+  async function withProjects(payload) {
+    try {
+      payload.projects = await discoverProjects();
+    } catch (error) {
+      payload.projects = { total: 0, missing: [], error: error.message };
+    }
+    return payload;
+  }
+
   async function apiConfig(req, res) {
     if (req.method === "GET") {
-      json(res, 200, snapshot());
+      json(res, 200, await withProjects(snapshot()));
       return;
     }
     if (req.method === "POST") {
@@ -235,10 +302,34 @@ export function apply(ctx) {
         json(res, 400, { error: "body must be JSON" });
         return;
       }
-      json(res, 200, applySettings(parsed));
+      json(res, 200, await withProjects(applySettings(parsed)));
       return;
     }
     json(res, 405, { error: "method not allowed" });
+  }
+
+  /**
+   * Register every directory that has history but no workspace entry.
+   *
+   * Explicit and user-triggered on purpose: this writes the durable workspace
+   * registry, which is the user's own state, so it should never happen as a
+   * side effect of opening a settings page.
+   */
+  async function apiSync(req, res) {
+    if (req.method !== "POST") {
+      json(res, 405, { error: "method not allowed" });
+      return;
+    }
+    let result;
+    try {
+      result = await syncProjects();
+    } catch (error) {
+      json(res, 500, { error: error.message });
+      return;
+    }
+    const payload = await withProjects(snapshot());
+    payload.synced = result;
+    json(res, 200, payload);
   }
 
   async function apiRotate(req, res) {
@@ -258,6 +349,10 @@ export function apply(ctx) {
   ctx.effect(
     () => ctx.webServer.register({ kind: "exact", path: "/remote/api/rotate", handler: apiRotate }),
     "dsh-remote: rotate api",
+  );
+  ctx.effect(
+    () => ctx.webServer.register({ kind: "exact", path: "/remote/api/sync", handler: apiSync }),
+    "dsh-remote: project sync api",
   );
 
   // ── the public listener ───────────────────────────────────────────────────
@@ -300,6 +395,10 @@ export function apply(ctx) {
       }
       if (path === "/remote/api/rotate") {
         await apiRotate(req, res);
+        return;
+      }
+      if (path === "/remote/api/sync") {
+        await apiSync(req, res);
         return;
       }
       if (path === "/remote/rotate") {

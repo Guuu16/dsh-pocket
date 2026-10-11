@@ -176,6 +176,35 @@ window.__ModuleLoader__.load({
         }
       }, [adopt, flashNote]);
 
+      /**
+       * Register every directory that has history but no workspace entry.
+       *
+       * The GUI sidebar lists workspaces, so a project the registry never
+       * learned about is invisible on the phone even though its transcripts
+       * are on disk. dsh computes workspace membership from the session
+       * `cwd`, so registering the directory is all it takes for the history
+       * to show up.
+       */
+      const sync = useCallback(async () => {
+        setBusy(true);
+        setActionError("");
+        try {
+          const res = await fetch("/remote/api/sync", { method: "POST", credentials: "same-origin" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          adopt(data, false);
+          const added = data.synced.added.length;
+          const failed = data.synced.failed.length;
+          flashNote(failed === 0
+            ? `已补上 ${added} 个项目，刷新页面就能看到。`
+            : `补上 ${added} 个，${failed} 个失败：${data.synced.failed[0]}`);
+        } catch (e) {
+          setActionError("同步失败：" + e.message);
+        } finally {
+          setBusy(false);
+        }
+      }, [adopt, flashNote]);
+
       if (draft === null || state === null) {
         return h("div", { className: "dshp" }, h("style", null, CSS), h("p", null, error === "" ? "加载中…" : error));
       }
