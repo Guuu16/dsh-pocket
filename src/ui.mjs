@@ -415,16 +415,20 @@ export function renderLinkDone(input) {
 /** Pre-auth landing page: one button that plants the access cookie. */
 export function renderUnlock(input) {
   return page({
-    title: "dsh remote · unlock",
+    title: "dsh remote · 需要密钥",
     heading: "dsh remote",
-    subheading: "access key required",
+    subheading: "需要访问密钥",
     actions: "",
     body: `
 <div class="empty">
-  Add <code>?k=&lt;access-key&gt;</code> to this URL once. The gateway then keeps an
-  HttpOnly cookie on this phone for ${input.days} days.
+  这个地址需要一个访问密钥。<b>最省事的办法是用手机相机扫二维码</b>——在电脑上的 dsh 里打开
+  <b>设置 → 远程访问</b>，那里每个地址旁边都有码，扫一下就直接进来了。
 </div>
-<div class="footer">Access key file: <code>${escapeHtml(input.configPath)}</code></div>`,
+<div class="empty">
+  手上有密钥的话，在地址后面加一次 <code>?k=&lt;access-key&gt;</code> 也行。进来之后
+  这台手机就记住了，${input.days} 天不用再输。
+</div>
+<div class="footer">没装这个插件、没有这把密钥，任何人都进不来。</div>`,
   });
 }
 

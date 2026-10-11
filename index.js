@@ -33,7 +33,6 @@ import { ensureKeyLogin } from "./src/ssh-setup.mjs";
 import { renderConfigPage } from "./src/config-page.mjs";
 import QRCode from "qrcode";
 import { renderUnlock } from "./src/ui.mjs";
-import { configPath } from "./src/config.mjs";
 
 /** Stable Cordis plugin name. */
 export const name = "dsh-remote";
@@ -542,7 +541,7 @@ export function apply(ctx) {
         if (path === "/" || path === "/index.html") {
           // Never render the settings page here: it embeds the access key, which
           // would hand the key to the very requests it is meant to reject.
-          html(res, 401, renderUnlock({ days: store.cookieDays, configPath: configPath() }));
+          html(res, 401, renderUnlock({ days: store.cookieDays }));
           return;
         }
         text(res, 401, "dsh-remote: unauthorized. Open the URL printed by the plugin, or add ?k=<access-key>.\n");
