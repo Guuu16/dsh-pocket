@@ -59,6 +59,13 @@ window.__ModuleLoader__.load({
 .dshr-url { display: block; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; word-break: break-all;
   font-family: ui-monospace, Menlo, monospace; background: var(--dsw-alias-bg-layer-2, #1b2130);
   border: 1px solid var(--dsw-alias-border-l1, #252b36); color: var(--dsw-alias-label-primary, #e7ebf3); }
+.dshr-qrbox { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.dshr-qr { width: 124px; height: 124px; flex: none; border-radius: 10px; background: #ffffff; padding: 6px; }
+.dshr-plist { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.dshr-pline { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.dshr-ptitle { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  color: var(--dsw-alias-label-primary, #e7ebf3); min-width: 110px; }
+.dshr-warn-card { border-color: #d9a441 !important; }
 `;
 
     const MODES = [
@@ -87,14 +94,14 @@ window.__ModuleLoader__.load({
      * forty-three-character key on a phone keyboard.
      */
     function Qr({ url }) {
-      return h("div", { className: "dshp-qrbox" },
+      return h("div", { className: "dshr-qrbox" },
         h("img", {
-          className: "dshp-qr",
+          className: "dshr-qr",
           src: "/remote/api/qr?text=" + encodeURIComponent(url),
           alt: "扫码打开",
           loading: "lazy",
         }),
-        h("span", { className: "dshp-note" }, "手机相机直接扫这个，不用输密钥。")
+        h("span", { className: "dshr-note" }, "手机相机直接扫这个，不用输密钥。")
       );
     }
 
@@ -248,6 +255,45 @@ window.__ModuleLoader__.load({
         h("h3", null, "远程访问"),
         h("p", null, "手机访问的就是 dsh 本身的界面——同一份工作区、同一份聊天记录。这里配置从外网进来的路径。"),
 
+        (function projectsCard() {
+          const projects = state.projects ?? { total: 0, registered: [], missing: [] };
+          const registered = projects.registered ?? [];
+          const missing = projects.missing ?? [];
+          const orphans = registered.filter((item) => item.present === false);
+          const pending = missing.reduce((sum, item) => sum + item.sessions, 0);
+          const healthy = missing.length === 0 && orphans.length === 0;
+
+          const line = (item, mark, markClass) =>
+            h("div", { className: "dshr-pline", key: item.path },
+              h("span", { className: markClass }, mark),
+              h("span", { className: "dshr-ptitle" }, item.title),
+              h("span", { className: "dshr-note" }, item.sessions === undefined ? "" : `${item.sessions} 个会话`)
+            );
+
+          const rows = [];
+          for (const item of registered) {
+            rows.push(line(item, item.present === false ? "✕" : "✓", item.present === false ? "dshr-bad" : "dshr-ok"));
+          }
+          for (const item of missing) rows.push(line(item, "＋", "dshr-wait"));
+
+          return h("div", { className: "dshr-card" + (healthy ? " dshr-ok-card" : " dshr-warn-card") },
+            h("h3", null, healthy
+              ? `项目 · ${registered.length} 个，全部可用`
+              : `项目 · ${missing.length + orphans.length} 个有问题`),
+            h("p", { className: "dshr-note" }, missing.length === 0
+              ? `磁盘上有历史记录的 ${projects.total} 个目录，都在 dsh 的侧边栏里。手机上打开就是这个列表。`
+              : `磁盘上有 ${projects.total} 个目录的历史记录，其中 ${missing.length} 个没进 dsh 的工作区列表，打开侧边栏看不到它们，${pending} 个会话也一起看不见：`),
+            orphans.length === 0 ? null : h("p", { className: "dshr-err" },
+              `${orphans.length} 个工作区的目录已经不在了：${orphans.map((o) => o.title).join("、")}`),
+            h("div", { className: "dshr-plist" }, rows),
+            missing.length === 0 ? null : h("div", { className: "dshr-actions" },
+              h("button", { type: "button", className: "primary", onClick: sync, disabled: busy },
+                busy ? "处理中…" : `补齐这 ${missing.length} 个项目（${pending} 个会话）`),
+              h("span", { className: "dshr-note" }, "写进 dsh 自己的工作区列表，刷新后出现")
+            )
+          );
+        })(),
+
         h("div", { className: "dshr-card" },
           Row({ label: "网关", children: h(Pill, { on: status.gateway === "listening" }, status.gateway === "listening" ? "监听中 :" + state.port : status.gateway) }),
           Row({ label: "中继隧道", children: tunnelLine }),
@@ -263,6 +309,7 @@ window.__ModuleLoader__.load({
           publicUrl
             ? h("code", { className: "dshr-url" }, publicUrl + "/?k=" + key)
             : h("p", null, tunnelFailed ? "没有拿到公网地址。" : "尚未建立公网入口。"),
+          publicUrl ? h(Qr, { url: publicUrl + "/?k=" + key }) : null,
           h("p", { className: "dshr-note" }, tunnelUp
             ? "把上面这一整行（含 ?k=）发到手机上打开，然后加进主屏。"
             : "不在同一网络时用这个。必须带 ?k=，第一次打开会换成 cookie。")
@@ -272,7 +319,10 @@ window.__ModuleLoader__.load({
           h("h3", null, "局域网地址"),
           (state.lanUrls ?? []).length === 0
             ? h("p", null, "没有检测到局域网地址。")
-            : (state.lanUrls ?? []).map((url, i) => h("code", { className: "dshr-url", key: i }, url + "/?k=" + key)),
+            : (state.lanUrls ?? []).map((url, i) => h("div", { key: i },
+                h("code", { className: "dshr-url" }, url + "/?k=" + key),
+                i === 0 ? h(Qr, { url: url + "/?k=" + key }) : null,
+              )),
           h("p", { className: "dshr-note" }, "手机和这台机器同一个 WiFi 时直接用这个，最快。")
         ),
 

@@ -230,15 +230,43 @@ export function apply(ctx) {
       if (typeof cwd !== "string" || cwd === "") continue;
       counts.set(cwd, (counts.get(cwd) ?? 0) + 1);
     }
-    const owned = new Set();
-    for (const workspace of ctx.workspaceRegistry.list()) owned.add(workspace.path);
+
+    const workspaces = ctx.workspaceRegistry.list();
+    const owned = new Set(workspaces.map((workspace) => workspace.path));
+
+    // `sessionIds` is already filtered by the canonical-cwd index, so this is
+    // the count the sidebar shows, not a count we derived ourselves.
+    const registered = [];
+    for (const workspace of workspaces) {
+      let present = true;
+      try {
+        present = (await workspace.status()) === "ok";
+      } catch {
+        // A registry read must never be the reason this whole endpoint fails.
+        present = true;
+      }
+      registered.push({
+        path: workspace.path,
+        title: workspace.title,
+        sessions: workspace.sessionIds.length,
+        present,
+      });
+    }
+    registered.sort((a, b) => b.sessions - a.sessions);
+
     const missing = [];
     for (const [cwd, sessions] of counts) {
       if (owned.has(cwd)) continue;
       missing.push({ path: cwd, title: basename(cwd), sessions });
     }
     missing.sort((a, b) => b.sessions - a.sessions);
-    return { total: counts.size, missing };
+
+    return {
+      total: counts.size,
+      registered,
+      missing,
+      orphaned: registered.filter((item) => item.present === false).length,
+    };
   }
 
   /**
