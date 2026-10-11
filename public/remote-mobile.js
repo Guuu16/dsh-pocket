@@ -1,5 +1,5 @@
 /*
- * Mobile comfort layer for the dsh web GUI, injected by the dsh pocket gateway.
+ * Mobile comfort layer for the dsh web GUI, injected by the dsh remote gateway.
  *
  * Scope is intentionally narrow. The GUI is already responsive: on a narrow
  * viewport its icon rail collapses the workspace sidebar, and "打开侧边栏"

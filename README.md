@@ -4,6 +4,15 @@
 
 装一个插件，在 dsh 的**设置 → 远程访问**里填一台服务器（或者什么都不填，用 Cloudflare），手机就能在任何网络下打开 dsh 本身——同一份工作区、同一份聊天记录，不是第二份副本。
 
+<p align="center">
+  <img src="docs/mobile-chat.png" width="300" alt="手机上打开 dsh：聊天界面">
+  <img src="docs/mobile-sidebar.png" width="300" alt="工作区与会话列表">
+</p>
+
+手机浏览器（390×844）实测截图。左边是展开的工作区与会话列表，右边是聊天。界面就是 dsh 自己的 Web GUI，插件没有另造一层。
+
+> **English**: a dsh plugin that makes this machine reachable from anywhere. Configure a relay (SSH reverse tunnel, or a zero-config Cloudflare tunnel) from dsh's own Settings page; your phone then opens the real dsh web GUI — the same runtime, the same workspaces and transcripts, not a second view of them. `dsh plugin --profile desktop add github:Guuu16/dsh-remote`
+
 ---
 
 ## 安装

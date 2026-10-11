@@ -84,9 +84,9 @@ export function renderConfigPage(input) {
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dsh pocket</title><style>${STYLE}</style></head>
+<title>dsh remote</title><style>${STYLE}</style></head>
 <body><div class="wrap">
-<h1>dsh pocket</h1>
+<h1>dsh remote</h1>
 <div class="sub">从任何地方访问这台机器的 dsh。手机访问 dsh 本身的界面——同一份工作区、同一份聊天记录。</div>
 
 <h2>当前状态</h2>

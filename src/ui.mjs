@@ -228,8 +228,8 @@ ${projects.length === 0 ? '<div class="empty">No dsh history found under <code>$
 </div>`;
 
   return page({
-    title: "dsh pocket",
-    heading: "dsh pocket",
+    title: "dsh remote",
+    heading: "dsh remote",
     subheading: `${projects.length} projects · ${totalSessions} sessions`,
     actions: GUI_BUTTON,
     body,
@@ -373,7 +373,7 @@ export function renderLink(input) {
   const nothing = plan.add.length === 0 && plan.extend.length === 0;
 
   return page({
-    title: "dsh pocket · register projects",
+    title: "dsh remote · register projects",
     heading: "Register projects",
     subheading: "into the GUI workspace store",
     back: "/",
@@ -398,7 +398,7 @@ ${nothing ? "" : `<form method="post" action="/link" style="margin-top:16px">
 /** Result page for a completed link. */
 export function renderLinkDone(input) {
   return page({
-    title: "dsh pocket · registered",
+    title: "dsh remote · registered",
     heading: "Projects registered",
     subheading: `${input.added} added · ${input.extended} extended`,
     back: "/",
@@ -415,8 +415,8 @@ export function renderLinkDone(input) {
 /** Pre-auth landing page: one button that plants the access cookie. */
 export function renderUnlock(input) {
   return page({
-    title: "dsh pocket · unlock",
-    heading: "dsh pocket",
+    title: "dsh remote · unlock",
+    heading: "dsh remote",
     subheading: "access key required",
     actions: "",
     body: `
@@ -431,8 +431,8 @@ export function renderUnlock(input) {
 /** Fatal startup error page. */
 export function renderFault(input) {
   return page({
-    title: "dsh pocket · error",
-    heading: "dsh pocket",
+    title: "dsh remote · error",
+    heading: "dsh remote",
     subheading: "not connected",
     actions: "",
     body: `<div class="empty">${escapeHtml(input.message)}</div>`,
