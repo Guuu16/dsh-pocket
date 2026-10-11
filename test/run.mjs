@@ -343,7 +343,7 @@ section('proxy');
   const gatewayPort = gateway.address().port;
 
   const result = await new Promise((resolve) => {
-    const req = request({ host: '127.0.0.1', port: gatewayPort, path: '/', headers: { connection: 'close' } }, (res) => {
+    const req = request({ host: '127.0.0.1', port: gatewayPort, path: '/', agent: false, headers: { connection: 'close' } }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
@@ -366,6 +366,106 @@ section('proxy');
     result.headers?.['content-encoding'] === undefined);
   check('the two header names are never both present',
     !(result.headers?.['content-length'] !== undefined && result.headers?.['transfer-encoding'] !== undefined));
+
+  gateway.close();
+  upstream.close();
+}
+
+// ── proxy protocol edges ────────────────────────────────────────────────────
+section('proxy protocol edges');
+{
+  const { createServer, request, Agent } = await import('node:http');
+  const { createProxy } = await import(new URL('src/proxy.mjs', ROOT).href);
+
+  // An upstream that answers the way dsh does for both hit and miss: an
+  // unknown path gets a bare 404 with no body at all.
+  const upstream = createServer((req, res) => {
+    if (req.url === '/exists') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end('<html><head></head><body>ok</body></html>');
+      return;
+    }
+    if (req.url === '/binary') {
+      const payload = Buffer.alloc(2048, 7);
+      res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': String(payload.length) });
+      res.end(payload);
+      return;
+    }
+    res.writeHead(404, { 'content-type': 'text/html' });
+    res.end();
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const upstreamPort = upstream.address().port;
+
+  const proxy = createProxy({
+    port: upstreamPort,
+    authority: `127.0.0.1:${upstreamPort}`,
+    cookie: () => undefined,
+    tapHtml: (html) => html.replace('</body>', '<!--tapped--></body>'),
+  });
+  const gateway = createServer((req, res) => proxy.handleHttp(req, res));
+  await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
+  const gatewayPort = gateway.address().port;
+
+  const hit = (path, { method = 'GET', headers = {} } = {}) =>
+    new Promise((resolve) => {
+      // agent: false forces a fresh connection. Node's global agent keeps
+      // sockets alive by default, and reusing one across these cases made the
+      // later probes answer 400 — a harness artefact, not a proxy defect.
+      const req = request({ host: '127.0.0.1', port: gatewayPort, path, method, agent: false, headers: { connection: 'close', ...headers } }, (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8'), bytes: Buffer.concat(chunks).length }));
+        res.on('error', (e) => resolve({ error: e.message }));
+      });
+      req.on('error', (e) => resolve({ error: e.message }));
+      req.end();
+    });
+
+  const ok = await hit('/exists');
+  check('a tapped document: no CL+TE pair', ok.headers['transfer-encoding'] === undefined,
+    `te=${ok.headers['transfer-encoding']}`);
+  check('a tapped document: the tap ran', (ok.body ?? '').includes('<!--tapped-->'));
+
+  const miss = await hit('/nope');
+  check('a bare 404 with no body still answers', miss.error === undefined && miss.status === 404,
+    miss.error ?? String(miss.status));
+  check('a 404 carries no illegal header pair',
+    !(miss.headers?.['content-length'] !== undefined && miss.headers?.['transfer-encoding'] !== undefined));
+
+  const head = await hit('/exists', { method: 'HEAD' });
+  check('HEAD answers without a body', head.error === undefined && head.status === 200 && head.bytes === 0,
+    head.error ?? `${head.status}/${head.bytes}B`);
+
+  const binary = await hit('/binary');
+  check('a non-HTML body passes through untouched', binary.status === 200 && binary.bytes === 2048,
+    `${binary.status}/${binary.bytes}B`);
+  check('a non-HTML body keeps its declared length',
+    binary.bytes === 2048 && binary.headers?.['content-encoding'] === undefined);
+
+  const ranged = await hit('/exists', { headers: { range: 'bytes=0-9' } });
+  check('a Range request does not produce an illegal response',
+    ranged.error === undefined, ranged.error ?? String(ranged.status));
+
+  const concurrent = await Promise.all(Array.from({ length: 20 }, () => hit('/exists')));
+  const good = concurrent.filter((r) => r.status === 200 && !r.error);
+  check('20 concurrent requests all succeed', good.length === 20, `${good.length}/20`);
+
+  // Connection reuse is the path a browser actually takes.
+  const agent = new Agent({ keepAlive: true, maxSockets: 2 });
+  const reused = await Promise.all(Array.from({ length: 6 }, () => new Promise((resolve) => {
+    const req = request({ host: '127.0.0.1', port: gatewayPort, path: '/exists', agent }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, bytes: Buffer.concat(chunks).length }));
+      res.on('error', (e) => resolve({ error: e.message }));
+    });
+    req.on('error', (e) => resolve({ error: e.message }));
+    req.end();
+  })));
+  agent.destroy();
+  check('keep-alive reuse works', reused.every((r) => r.status === 200 && r.bytes > 0),
+    JSON.stringify(reused.map((r) => r.error ?? r.status)));
 
   gateway.close();
   upstream.close();
